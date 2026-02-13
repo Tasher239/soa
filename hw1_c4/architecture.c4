@@ -17,7 +17,7 @@ model {
     description 'Покупатель маркетплейса'
   }
 
-  saler = actor 'Продавец' {
+  seller = actor 'Продавец' {
     description 'Продавец, выставляющий свою продукцию на маркетплейсе'
   }
 
@@ -34,42 +34,19 @@ model {
       description 'Точка входа: проверка токена, маршрутизация в сервисы'
     }
 
-    subservice products_service 'Система взаимодействия с товарами' {
-      description 'Отвечает за опереирование товарами, до момента покупки'
+    subservice catalog_service 'Сервис управления каталогом' {
+      description 'Отвечает за управление каталогом и поддеражнием его в актуальном состоянии'
 
-
-      component products_server '[API] Взаимодействие с товарами' {
+      component catalog_server '[API] Взаимодействие с товарами' {
         description 'Формаирует ленту товаров, так же конкретные страницы'
-      }
-
-      component product_recsys_event_producer 'Продюсер эвентов для рексиса' {
-        description 'Когда клиент по апи запрашивает страницу товара/кладет в корзину продъюсим эвент с просмотром'
-      }
-
-      component cart_processor 'Управление товарами в корзине клиента' {
-        description 'Добавление/удаление товаров в корзине клинета'
-      }
-
-      component saler_products 'Управление товарами продавцов' {
-        description 'Добавление/удаление товаров на продажу продавцами'
       }
 
       component catalog_provider 'Провайдер работы с каталогом' {
         description 'Обеспечивает работу с каталогом, при повялении/удалении товара, продъюсит собыятие в топик'
       }
 
-      database salers_products_db 'БД товаров выставленных продавцами (dynamoDB/Redis)' {
-        description 'Хранит маппинг id клинета на список товаров выставленных продавцами: client_id: list[prodict_id]'
-        style {
-          icon tech:postgresql
-        }
-      }
-
-      database cart_db 'БД товаров в корзинах (dynamoDB/Redis)' {
-        description 'Хранит маппинг клиента на список id товаров в корзине: client_id: list[product_id]'
-        style {
-          icon tech:redis
-        }
+      component product_recsys_event_producer 'Продюсер эвентов для рексиса' {
+        description 'Когда клиент запрашивает страницу товара продъюсим эвент с просмотром'
       }
 
       database catalog_db 'БД всех товаров (общий католог)' {
@@ -79,16 +56,58 @@ model {
         }
       }
 
-
-      products_server -> cart_processor
-      products_server -> saler_products
-      products_server -> catalog_provider
-      products_server -> product_recsys_event_producer
-
-      cart_processor -> cart_db
-      saler_products -> salers_products_db
+      catalog_server -> catalog_provider
+      catalog_provider -> product_recsys_event_producer
       catalog_provider -> catalog_db
+
     }
+
+    subservice cart_service 'Сервис управления корзиной'{
+      description 'Обеспечивает управление и доступ к корзине'
+      component cart_server '[API] Управление товарами в корзине клиента' {
+        description 'API для работы с корзиной'
+      }
+      component cart_processor 'Процессинг управления товарами в корзине' {
+        description 'Добавление/удаление товаров в корзине клинета'
+      }
+
+      component product_recsys_event_producer 'Продюсер эвентов для рексиса' {
+        description 'Когда клиент кладет в корзину продъюсим эвент'
+      }
+
+       database cart_db 'БД товаров в корзинах' {
+        description 'Хранит маппинг клиента на список id товаров в корзине: client_id: list[product_id]'
+        style {
+          icon tech:redis
+        }
+      }
+
+      cart_server -> cart_processor
+      cart_processor -> product_recsys_event_producer
+      cart_processor -> cart_db
+    }
+
+    subservice seller_service 'Севрис товаров продавца'{
+      description 'Обеспеичвает взаимодействие с товарами продавцов: публикация/изменение/удаление'
+      component seller_server '[API] Управление товарами продавцов' {
+        description 'Добавление/удаление товаров на продажу продавцами'
+      }
+
+      component seller_processor 'Управление товарами продавцов' {
+        description 'Добавление/удаление товаров в корзине клинета'
+      }
+
+      database sellers_products_db 'БД товаров выставленных продавцами' {
+        description 'Хранит маппинг id клинета на список товаров выставленных продавцами: client_id: list[prodict_id]'
+        style {
+          icon tech:postgresql
+        }
+      }
+
+      seller_server -> seller_processor
+      seller_processor -> sellers_products_db
+    }
+
 
     subservice recsys 'Рекомендательная система товаров' {
       description 'Выдает релеватные пользователю товары'
@@ -211,6 +230,7 @@ model {
       order_notification_producer -> orders_server
       orders_server -> orders_db
       orders_server -> orders_saga_orchestrator
+      payment_event_by_order_producer -> orders_saga_orchestrator
     }
 
     subservice search_service 'Севрвис поиска товаров' {
@@ -259,27 +279,32 @@ model {
 
     frontend -> gateway
     gateway -> users_server
-    gateway -> products_service.products_server
+    gateway -> cart_service.cart_server
+    gateway -> seller_service.seller_server
+    gateway -> catalog_service.catalog_server
     gateway -> orders_service.orders_server
     gateway -> recsys.recsys_server
     gateway -> search_service.search_server
 
-    internal_notif_order_events_broker -> notification_service.order_event_notif_consumer_producer
+    notification_service.order_event_notif_consumer_producer -> internal_notif_order_events_broker
 
     notification_service.order_event_notif_consumer_producer -> external_notif_order_events_broker
     external_notif_order_events_broker -> ext_notif_service
     recsys.recsys_events_consumer -> user_behavior_events
-    user_behavior_events -> products_service.product_recsys_event_producer
+    user_behavior_events -> catalog_service.product_recsys_event_producer
+    user_behavior_events -> cart_service.product_recsys_event_producer
     search_service.search_indexer -> product_catalog_events
 
-    products_service.catalog_provider -> product_catalog_events
-    products_service.products_server -> inventory_service.inventory_server
+    catalog_service.catalog_provider -> product_catalog_events
+    cart_service.cart_processor -> inventory_service.inventory_server
+    seller_service.seller_processor -> inventory_service.inventory_server
 
     orders_service.orders_saga_orchestrator -> inventory_service.inventory_server
     orders_service.orders_saga_orchestrator -> internal_payment_service.payment_server
     orders_service.orders_saga_orchestrator -> orders_service.orders_db
     orders_service.order_notification_producer -> orders_service.orders_saga_orchestrator
     internal_notif_order_events_broker -> orders_service.order_notification_producer
+    orders_service.payment_event_by_order_producer -> user_behavior_events
   }
 
   system ext_notif_service 'Внешний сервис нотификаций' {
@@ -301,7 +326,7 @@ model {
     }
 
   customer -> frontend
-  saler -> frontend
+  seller -> frontend
 
   internal_payment_service.payment_server -> external_payment_service.payment_server
 }
@@ -325,7 +350,9 @@ views {
     include *
     include marketplace.*
     include frontend
-    include products_service.*
+    include catalog_service.*
+    include cart_service.*
+    include seller_service.*
     include recsys.*
     include users_services.*
     include orders_service.*
@@ -335,4 +362,5 @@ views {
     include search_service.*
     include inventory_service.*
   }
+
 }
