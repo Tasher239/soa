@@ -1,0 +1,379 @@
+specification {
+  element actor {
+    style {
+      shape person
+    }
+  }
+  element system
+  element subservice
+  element component
+  element database {style{shape cylinder}}
+  element broker {style{shape queue}}
+
+}
+
+model {
+  customer = actor 'Покупатель' {
+    description 'Покупатель маркетплейса'
+  }
+
+  seller = actor 'Продавец' {
+    description 'Продавец, выставляющий свою продукцию на маркетплейсе'
+  }
+
+  marketplace = system 'Маркетплейс' {
+    subservice frontend 'Frontend' {
+      description 'Предоставляет клиентам доcтуп к просмотру каталога и заказу товаров'
+      style {
+        icon tech:nextjs-icon
+        shape browser
+      }
+    }
+
+    subservice gateway 'API Gateway' {
+      description 'Точка входа: проверка токена, маршрутизация в сервисы'
+    }
+
+    subservice catalog_service 'Сервис управления каталогом' {
+      description 'Отвечает за управление каталогом и поддержанием его в актуальном состоянии'
+
+      component catalog_server '[API] Взаимодействие с товарами' {
+        description 'Формирует ленту товаров, так же конкретные страницы'
+      }
+
+      component catalog_provider 'Провайдер работы с каталогом' {
+        description 'Обеспечивает работу с каталогом, при появлении/удалении товара, продъюсит событие в топик'
+      }
+
+      component product_recsys_event_producer 'Продюсер эвентов для рексиса' {
+        description 'Когда клиент запрашивает страницу товара продъюсим эвент с просмотром'
+      }
+
+      component seller_products_event_consumer 'Консюмер эвентов о товарах продавцов' {
+        description 'Слушает события о новых/измененных товарах от продавцов и обновляет общий каталог'
+      }
+
+      database catalog_db 'БД всех товаров (общий каталог)' {
+        description 'Хранит все выставленные товары и их данные'
+        style {
+          icon tech:postgresql
+        }
+      }
+
+      catalog_server -> catalog_provider
+      catalog_provider -> product_recsys_event_producer
+      catalog_provider -> catalog_db
+      seller_products_event_consumer -> catalog_db
+
+    }
+
+    subservice cart_service 'Сервис управления корзиной'{
+      description 'Обеспечивает управление и доступ к корзине'
+      component cart_server '[API] Управление товарами в корзине клиента' {
+        description 'API для работы с корзиной'
+      }
+      component cart_processor 'Процессинг управления товарами в корзине' {
+        description 'Добавление/удаление товаров в корзине клиента'
+      }
+
+      component product_recsys_event_producer 'Продюсер эвентов для рексиса' {
+        description 'Когда клиент кладет в корзину продъюсим эвент'
+      }
+
+       database cart_db 'БД товаров в корзинах' {
+        description 'Хранит маппинг клиента на список id товаров в корзине: client_id: list[product_id]'
+        style {
+          icon tech:redis
+        }
+      }
+
+      cart_server -> cart_processor
+      cart_processor -> product_recsys_event_producer
+      cart_processor -> cart_db
+    }
+
+    subservice seller_service 'Сервис товаров продавца'{
+      description 'Обеспечивает взаимодействие с товарами продавцов: публикация/изменение/удаление'
+      component seller_server '[API] Управление товарами продавцов' {
+        description 'Добавление/удаление товаров на продажу продавцами'
+      }
+
+      component seller_processor 'Управление товарами продавцов' {
+        description 'Добавление/удаление товаров в корзине клиента'
+      }
+
+      component product_catalog_event_producer 'Продюсер эвентов о товарах продавца' {
+        description 'Отправляет события о создании/изменении/удалении товаров продавцом в брокер'
+      }
+
+      database sellers_products_db 'БД товаров выставленных продавцами' {
+        description 'Хранит маппинг id клиента на список товаров выставленных продавцами: client_id: list[product_id]'
+        style {
+          icon tech:postgresql
+        }
+      }
+
+      seller_server -> seller_processor
+      seller_processor -> sellers_products_db
+      seller_processor -> product_catalog_event_producer
+    }
+
+
+    subservice recsys 'Рекомендательная система товаров' {
+      description 'Выдает релеватные пользователю товары'
+
+      component recsys_server '[API] RecSys' {
+        description 'API для взаимодействия с рекомендательной системой'
+      }
+
+      component recsys_events_consumer 'Consumer событий пользовательской активности' {
+        description '
+          Консюмит эвенты просмотров, кликов, добавлений в корзину и обновляет Feature Store для обучения моделей
+        '
+      }
+
+
+      database recsys_redis 'Кэш релеватных товаров' {
+        description 'Позволяет быстро получать релевантные для пользователя товары'
+        style {
+          icon tech:redis
+        }
+      }
+
+      database recsys_db 'Feature Store' {
+        description 'Хранит данные, необходимые для рекомендательных моделей'
+        style {
+          icon tech:cassandra
+        }
+      }
+
+      recsys_server -> recsys_redis
+      recsys_server -> recsys_db
+      recsys_events_consumer -> recsys_db
+    }
+
+    subservice users_services 'Сервис управления пользователями'{
+      description 'Админстирирование пользователей: создание/удаление/хранение учетных данных'
+
+      component users_server '[API] Управление и авторизация пользователями' {
+        description 'Удаление/добавление/авторизация пользователей'
+      }
+
+      component users_service 'Сервис управления пользовательской информацией' {
+        description 'Хранения пользовательской информации: ФИО, роль, предпочтения, сохраненные карты, телефон'
+      }
+
+      component users_auth 'Auth' {
+        description 'Система аутенцифицирует и авторизует пользователей'
+      }
+
+      database users_credentials 'БД учеток пользователей' {
+        description 'Хранение логинов/паролей пользователей'
+        style {
+          icon tech:postgresql
+        }
+      }
+
+      database users_profiles 'БД профилей пользователей' {
+        description 'Хранение пользовательскую информацию'
+        style {
+          icon tech:postgresql
+        }
+      }
+
+      users_server -> users_auth
+      users_server -> users_service
+      users_auth -> users_credentials
+      users_service -> users_profiles
+
+    }
+
+    subservice notification_service 'Сервис нотификаций' {
+      description 'Отправляет уведомления пользователю по смс/мессенджере'
+
+      component order_event_notif_consumer_producer 'Консюмер/продюсер эвентов обновления статусов заказов' {
+        description 'Консюминг из внутреннего топика, продъюсинг во внешний'
+      }
+    }
+
+    subservice internal_payment_service 'Внутренний платежный сервис' {
+      description 'Внутренний сервис проведения и учета платежей'
+
+      component payment_server '[API] Проведения оплат'
+      database payment_db 'Платежная БД' {
+        description 'БД для хранения платежей'
+      }
+
+      payment_server -> payment_db
+    }
+
+    subservice orders_service 'Сервис заказов' {
+      description 'Формирует и отслеживает заказы клиента'
+      component orders_server '[API] Работа с заказами'{
+        description 'Обеспечивает взаимодействие с заказами клиента'
+      }
+      component order_notification_producer 'Консюмер/продъюсер эвентов обновления статусов заказов'{
+      }
+
+      component orders_saga_orchestrator 'Saga Оркестратор' {
+        description '
+          Координирует распределенную транзакцию:
+          1. Reserve inventory
+          2. Create order (PAYMENT_PENDING)
+          3. Process payment
+          4. Confirm order OR compensate (rollback)
+        '
+      }
+
+
+      database orders_db 'БД заказов' {
+        description 'Хранит информацию о заказах'
+        style {
+          icon tech:postgresql
+        }
+      }
+
+      order_notification_producer -> orders_server
+      orders_server -> orders_db
+      orders_server -> orders_saga_orchestrator
+    }
+
+    subservice search_service 'Сервис поиска товаров' {
+      component search_server '[API] Поиск и фильтрация'
+      component search_indexer 'Индексация каталога'
+      database search_index_db 'ElasticSearch' {
+        description 'Индексы: products, sellers'
+        style {
+          icon tech:elasticsearch
+        }
+      }
+
+      search_indexer -> search_index_db
+      search_server -> search_index_db
+    }
+
+    subservice inventory_service 'Сервис управления складом' {
+      component inventory_server '[API] Управление остатками'
+      database inventory_db 'БД остатков товаров' {
+        description 'product_id, quantity, reserved_quantity, warehouse_id'
+        style {
+          icon tech:postgresql
+        }
+      }
+      inventory_server -> inventory_db
+    }
+
+    broker internal_notif_order_events_broker  'Для эвентов изменения статусов заказов'{
+      style {
+        icon tech:kafka
+      }
+    }
+
+    broker user_behavior_events 'Эвенты пользовательского поведения' {
+      style {
+        icon tech:kafka
+      }
+    }
+
+    broker product_catalog_events 'Эвенты товаров в каталоге' {
+      style {
+        icon tech:kafka
+      }
+    }
+
+    broker seller_products_events 'Эвенты о товарах продавцов' {
+      description 'События о создании/изменении/удалении товаров продавцами'
+      style {
+        icon tech:kafka
+      }
+    }
+
+
+    frontend -> gateway
+    gateway -> users_server
+    gateway -> cart_service.cart_server
+    gateway -> seller_service.seller_server
+    gateway -> catalog_service.catalog_server
+    gateway -> orders_service.orders_server
+    gateway -> recsys.recsys_server
+    gateway -> search_service.search_server
+
+    internal_notif_order_events_broker -> notification_service.order_event_notif_consumer_producer
+    notification_service.order_event_notif_consumer_producer -> external_notif_order_events_broker
+
+    external_notif_order_events_broker -> ext_notif_service
+    user_behavior_events -> recsys.recsys_events_consumer
+    catalog_service.product_recsys_event_producer -> user_behavior_events
+    cart_service.product_recsys_event_producer -> user_behavior_events
+    product_catalog_events -> search_service.search_indexer
+
+    catalog_service.catalog_provider -> product_catalog_events
+    seller_service.product_catalog_event_producer -> seller_products_events
+    seller_products_events -> catalog_service.seller_products_event_consumer
+    cart_service.cart_processor -> inventory_service.inventory_server
+    seller_service.seller_processor -> inventory_service.inventory_server
+
+    orders_service.orders_saga_orchestrator -> inventory_service.inventory_server
+    orders_service.orders_saga_orchestrator -> internal_payment_service.payment_server
+    orders_service.orders_saga_orchestrator -> orders_service.orders_db
+    orders_service.order_notification_producer -> orders_service.orders_saga_orchestrator
+    orders_service.order_notification_producer -> internal_notif_order_events_broker
+  }
+
+  system ext_notif_service 'Внешний сервис нотификаций' {
+    description 'Отправляет уведомления по смс/тг'
+  }
+
+  broker external_notif_order_events_broker 'Для эвентов изменения статусов заказов'{
+      style {
+          icon tech:kafka
+        }
+    }
+
+  system external_payment_service 'Внешний платежный сервис' {
+      description 'Формирует и валидрует платежные квитанции'
+
+      component payment_server '[API] Проведения оплат' {
+        description 'Предоставляет API для проведения денежных транзакций'
+      }
+    }
+
+  customer -> frontend
+  seller -> frontend
+
+  internal_payment_service.payment_server -> external_payment_service.payment_server
+}
+
+
+views {
+  view index {
+    title 'Context Diagram (C1)'
+
+    include *
+  }
+
+  view of marketplace {
+    title 'Container Diagram (C2)'
+    include *
+  }
+
+  view C3 {
+    title 'Component Diagram (C3)'
+    autoLayout LeftRight
+    include *
+    include marketplace.*
+    include frontend
+    include catalog_service.*
+    include cart_service.*
+    include seller_service.*
+    include recsys.*
+    include users_services.*
+    include orders_service.*
+    include notification_service.*
+    include external_payment_service.*
+    include internal_payment_service.*
+    include search_service.*
+    include inventory_service.*
+  }
+
+}
