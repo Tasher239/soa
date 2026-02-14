@@ -49,6 +49,10 @@ model {
         description 'Когда клиент запрашивает страницу товара продъюсим эвент с просмотром'
       }
 
+      component seller_products_event_consumer 'Консюмер эвентов о товарах продавцов' {
+        description 'Слушает события о новых/измененных товарах от продавцов и обновляет общий каталог'
+      }
+
       database catalog_db 'БД всех товаров (общий католог)' {
         description 'Хранит все выставленные товары и их данные'
         style {
@@ -59,6 +63,7 @@ model {
       catalog_server -> catalog_provider
       catalog_provider -> product_recsys_event_producer
       catalog_provider -> catalog_db
+      seller_products_event_consumer -> catalog_db
 
     }
 
@@ -97,6 +102,10 @@ model {
         description 'Добавление/удаление товаров в корзине клинета'
       }
 
+      component product_catalog_event_producer 'Продюсер эвентов о товарах продавца' {
+        description 'Отправляет события о создании/изменении/удалении товаров продавцом в брокер'
+      }
+
       database sellers_products_db 'БД товаров выставленных продавцами' {
         description 'Хранит маппинг id клинета на список товаров выставленных продавцами: client_id: list[prodict_id]'
         style {
@@ -106,6 +115,7 @@ model {
 
       seller_server -> seller_processor
       seller_processor -> sellers_products_db
+      seller_processor -> product_catalog_event_producer
     }
 
 
@@ -276,6 +286,13 @@ model {
       }
     }
 
+    broker seller_products_events 'Эвенты о товарах продавцов' {
+      description 'События о создании/изменении/удалении товаров продавцами'
+      style {
+        icon tech:kafka
+      }
+    }
+
 
     frontend -> gateway
     gateway -> users_server
@@ -296,6 +313,8 @@ model {
     search_service.search_indexer -> product_catalog_events
 
     catalog_service.catalog_provider -> product_catalog_events
+    seller_products_events -> seller_service.product_catalog_event_producer
+    catalog_service.seller_products_event_consumer -> seller_products_events
     cart_service.cart_processor -> inventory_service.inventory_server
     seller_service.seller_processor -> inventory_service.inventory_server
 
@@ -304,7 +323,7 @@ model {
     orders_service.orders_saga_orchestrator -> orders_service.orders_db
     orders_service.order_notification_producer -> orders_service.orders_saga_orchestrator
     internal_notif_order_events_broker -> orders_service.order_notification_producer
-    orders_service.payment_event_by_order_producer -> user_behavior_events
+    user_behavior_events -> orders_service.payment_event_by_order_producer
   }
 
   system ext_notif_service 'Внешний сервис нотификаций' {
