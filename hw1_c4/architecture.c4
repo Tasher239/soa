@@ -35,14 +35,14 @@ model {
     }
 
     subservice catalog_service 'Сервис управления каталогом' {
-      description 'Отвечает за управление каталогом и поддеражнием его в актуальном состоянии'
+      description 'Отвечает за управление каталогом и поддержанием его в актуальном состоянии'
 
       component catalog_server '[API] Взаимодействие с товарами' {
-        description 'Формаирует ленту товаров, так же конкретные страницы'
+        description 'Формирует ленту товаров, так же конкретные страницы'
       }
 
       component catalog_provider 'Провайдер работы с каталогом' {
-        description 'Обеспечивает работу с каталогом, при повялении/удалении товара, продъюсит собыятие в топик'
+        description 'Обеспечивает работу с каталогом, при появлении/удалении товара, продъюсит событие в топик'
       }
 
       component product_recsys_event_producer 'Продюсер эвентов для рексиса' {
@@ -53,7 +53,7 @@ model {
         description 'Слушает события о новых/измененных товарах от продавцов и обновляет общий каталог'
       }
 
-      database catalog_db 'БД всех товаров (общий католог)' {
+      database catalog_db 'БД всех товаров (общий каталог)' {
         description 'Хранит все выставленные товары и их данные'
         style {
           icon tech:postgresql
@@ -73,7 +73,7 @@ model {
         description 'API для работы с корзиной'
       }
       component cart_processor 'Процессинг управления товарами в корзине' {
-        description 'Добавление/удаление товаров в корзине клинета'
+        description 'Добавление/удаление товаров в корзине клиента'
       }
 
       component product_recsys_event_producer 'Продюсер эвентов для рексиса' {
@@ -92,14 +92,14 @@ model {
       cart_processor -> cart_db
     }
 
-    subservice seller_service 'Севрис товаров продавца'{
-      description 'Обеспеичвает взаимодействие с товарами продавцов: публикация/изменение/удаление'
+    subservice seller_service 'Сервис товаров продавца'{
+      description 'Обеспечивает взаимодействие с товарами продавцов: публикация/изменение/удаление'
       component seller_server '[API] Управление товарами продавцов' {
         description 'Добавление/удаление товаров на продажу продавцами'
       }
 
       component seller_processor 'Управление товарами продавцов' {
-        description 'Добавление/удаление товаров в корзине клинета'
+        description 'Добавление/удаление товаров в корзине клиента'
       }
 
       component product_catalog_event_producer 'Продюсер эвентов о товарах продавца' {
@@ -107,7 +107,7 @@ model {
       }
 
       database sellers_products_db 'БД товаров выставленных продавцами' {
-        description 'Хранит маппинг id клинета на список товаров выставленных продавцами: client_id: list[prodict_id]'
+        description 'Хранит маппинг id клиента на список товаров выставленных продавцами: client_id: list[product_id]'
         style {
           icon tech:postgresql
         }
@@ -134,7 +134,7 @@ model {
 
 
       database recsys_redis 'Кэш релеватных товаров' {
-        description 'Позваоляет быстро получать релевантные для пользователя товары'
+        description 'Позволяет быстро получать релевантные для пользователя товары'
         style {
           icon tech:redis
         }
@@ -160,7 +160,7 @@ model {
       }
 
       component users_service 'Сервис управления пользовательской информацией' {
-        description 'Хранения пользователеской информации: ФИО, роль, предпочтения, сохраненные карты, телефон'
+        description 'Хранения пользовательской информации: ФИО, роль, предпочтения, сохраненные карты, телефон'
       }
 
       component users_auth 'Auth' {
@@ -168,14 +168,14 @@ model {
       }
 
       database users_credentials 'БД учеток пользователей' {
-        description 'Хранение логинов/паролей пользваотелей'
+        description 'Хранение логинов/паролей пользователей'
         style {
           icon tech:postgresql
         }
       }
 
       database users_profiles 'БД профилей пользователей' {
-        description 'Хранение пользваотельскую информацию'
+        description 'Хранение пользовательскую информацию'
         style {
           icon tech:postgresql
         }
@@ -189,7 +189,7 @@ model {
     }
 
     subservice notification_service 'Сервис нотификаций' {
-      description 'Отправляеь уведомления пользователю по смс/мессенджере'
+      description 'Отправляет уведомления пользователю по смс/мессенджере'
 
       component order_event_notif_consumer_producer 'Консюмер/продюсер эвентов обновления статусов заказов' {
         description 'Консюминг из внутреннего топика, продъюсинг во внешний'
@@ -210,13 +210,13 @@ model {
     subservice orders_service 'Сервис заказов' {
       description 'Формирует и отслеживает заказы клиента'
       component orders_server '[API] Работа с заказами'{
-        description 'Обеспечивает взаимодейтсвие с заказами клиента'
+        description 'Обеспечивает взаимодействие с заказами клиента'
       }
       component order_notification_producer 'Консюмер/продъюсер эвентов обновления статусов заказов'{
       }
 
       component payment_event_by_order_producer 'Продюсер эвентов по оплате заказа' {
-        description 'Пордюсит эвент об оплате/отмене оплаты заказа'
+        description 'Продюсит эвент об оплате/отмене оплаты заказа'
       }
 
       component orders_saga_orchestrator 'Saga Оркестратор' {
@@ -231,7 +231,7 @@ model {
 
 
       database orders_db 'БД заказов' {
-        description 'Хранит информаицию о заказах'
+        description 'Хранит информацию о заказах'
         style {
           icon tech:postgresql
         }
@@ -243,7 +243,7 @@ model {
       payment_event_by_order_producer -> orders_saga_orchestrator
     }
 
-    subservice search_service 'Севрвис поиска товаров' {
+    subservice search_service 'Сервис поиска товаров' {
       component search_server '[API] Поиск и фильтрация'
       component search_indexer 'Индексация каталога'
       database search_index_db 'ElasticSearch' {
@@ -303,18 +303,18 @@ model {
     gateway -> recsys.recsys_server
     gateway -> search_service.search_server
 
-    notification_service.order_event_notif_consumer_producer -> internal_notif_order_events_broker
-
+    internal_notif_order_events_broker -> notification_service.order_event_notif_consumer_producer
     notification_service.order_event_notif_consumer_producer -> external_notif_order_events_broker
+
     external_notif_order_events_broker -> ext_notif_service
-    recsys.recsys_events_consumer -> user_behavior_events
-    user_behavior_events -> catalog_service.product_recsys_event_producer
-    user_behavior_events -> cart_service.product_recsys_event_producer
-    search_service.search_indexer -> product_catalog_events
+    user_behavior_events -> recsys.recsys_events_consumer
+    catalog_service.product_recsys_event_producer -> user_behavior_events
+    cart_service.product_recsys_event_producer -> user_behavior_events
+    product_catalog_events -> search_service.search_indexer
 
     catalog_service.catalog_provider -> product_catalog_events
-    seller_products_events -> seller_service.product_catalog_event_producer
-    catalog_service.seller_products_event_consumer -> seller_products_events
+    seller_service.product_catalog_event_producer -> seller_products_events
+    seller_products_events -> catalog_service.seller_products_event_consumer
     cart_service.cart_processor -> inventory_service.inventory_server
     seller_service.seller_processor -> inventory_service.inventory_server
 
@@ -322,8 +322,7 @@ model {
     orders_service.orders_saga_orchestrator -> internal_payment_service.payment_server
     orders_service.orders_saga_orchestrator -> orders_service.orders_db
     orders_service.order_notification_producer -> orders_service.orders_saga_orchestrator
-    internal_notif_order_events_broker -> orders_service.order_notification_producer
-    user_behavior_events -> orders_service.payment_event_by_order_producer
+    orders_service.order_notification_producer -> internal_notif_order_events_broker
   }
 
   system ext_notif_service 'Внешний сервис нотификаций' {
