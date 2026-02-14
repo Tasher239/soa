@@ -236,7 +236,6 @@ model {
       order_notification_producer -> orders_server
       orders_server -> orders_db
       orders_server -> orders_saga_orchestrator
-      payment_event_by_order_producer -> orders_saga_orchestrator
     }
 
     subservice search_service 'Сервис поиска товаров' {
