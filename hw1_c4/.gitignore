@@ -1,1 +1,12 @@
-.idea/
+  __pycache__/
+  *.py[cod]
+  *$py.class
+
+  .venv/
+  venv/
+  ENV/
+
+  .idea/
+  .vscode/
+  *.swp
+  *.swo
