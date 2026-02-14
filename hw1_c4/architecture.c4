@@ -215,10 +215,6 @@ model {
       component order_notification_producer 'Консюмер/продъюсер эвентов обновления статусов заказов'{
       }
 
-      component payment_event_by_order_producer 'Продюсер эвентов по оплате заказа' {
-        description 'Продюсит эвент об оплате/отмене оплаты заказа'
-      }
-
       component orders_saga_orchestrator 'Saga Оркестратор' {
         description '
           Координирует распределенную транзакцию:
