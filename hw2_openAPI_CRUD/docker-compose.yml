@@ -1,0 +1,50 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: marketplace_db
+    environment:
+      POSTGRES_USER: marketplace
+      POSTGRES_PASSWORD: marketplace
+      POSTGRES_DB: marketplace
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marketplace"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    build: .
+    container_name: marketplace_migrate
+    environment:
+      DATABASE_URL: postgresql+asyncpg://marketplace:marketplace@db:5432/marketplace
+    command: alembic upgrade head
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app:
+    build: .
+    container_name: marketplace_app
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://marketplace:marketplace@db:5432/marketplace
+      JWT_SECRET: super-secret-key-change-in-production
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      REFRESH_TOKEN_EXPIRE_DAYS: 30
+      RATE_LIMIT_MINUTES: 1
+      DEBUG: "false"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: on-failure
+
+volumes:
+  postgres_data:
