@@ -6,6 +6,9 @@ on:
       - master
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
   contents: read
   packages: write
@@ -13,8 +16,6 @@ permissions:
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,9 +47,9 @@ jobs:
 
       - name: Set namespace
         run: |
-          kubectl create namespace project-prj-1774037146422854262 --dry-run=client -o yaml | kubectl apply --validate=false -f -
+          kubectl create namespace project-prj-1774042848160289211 --dry-run=client -o yaml | kubectl apply --validate=false -f -
 
       - name: Deploy manifests
         run: |
-          sed "s#IMAGE_PLACEHOLDER#${{ env.IMAGE }}#g" k8s/api/deployment.yaml | kubectl -n project-prj-1774037146422854262 apply --validate=false -f -
-          kubectl -n project-prj-1774037146422854262 apply --validate=false -f k8s/api/service.yaml
+          sed "s#IMAGE_PLACEHOLDER#${{ env.IMAGE }}#g" k8s/api/deployment.yaml | kubectl -n project-prj-1774042848160289211 apply --validate=false -f -
+          kubectl -n project-prj-1774042848160289211 apply --validate=false -f k8s/api/service.yaml
