@@ -45,11 +45,7 @@ jobs:
           mkdir -p $HOME/.kube
           echo "${{ secrets.KUBECONFIG_BASE64 }}" | base64 --decode > $HOME/.kube/config
 
-      - name: Set namespace
-        run: |
-          kubectl create namespace project-prj-1774042848160289211 --dry-run=client -o yaml | kubectl apply --validate=false -f -
-
       - name: Deploy manifests
         run: |
-          sed "s#IMAGE_PLACEHOLDER#${{ env.IMAGE }}#g" k8s/api/deployment.yaml | kubectl -n project-prj-1774042848160289211 apply --validate=false -f -
-          kubectl -n project-prj-1774042848160289211 apply --validate=false -f k8s/api/service.yaml
+          sed "s#IMAGE_PLACEHOLDER#${{ env.IMAGE }}#g" k8s/api/deployment.yaml | kubectl -n default apply --validate=false -f -
+          kubectl -n default apply --validate=false -f k8s/api/service.yaml
