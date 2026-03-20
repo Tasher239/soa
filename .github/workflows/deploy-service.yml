@@ -34,7 +34,7 @@ jobs:
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: hw1_c4
           file: hw1_c4/Dockerfile
           push: true
           tags: ${{ env.IMAGE }}
