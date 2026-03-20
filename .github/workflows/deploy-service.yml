@@ -13,9 +13,16 @@ permissions:
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set image name
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE=ghcr.io/${OWNER}/soa-api:${{ github.sha }}" >> $GITHUB_ENV
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -30,7 +37,7 @@ jobs:
           context: .
           file: hw1_c4/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/soa-api:${{ github.sha }}
+          tags: ${{ env.IMAGE }}
 
       - name: Configure kubectl
         run: |
@@ -43,5 +50,5 @@ jobs:
 
       - name: Deploy manifests
         run: |
-          sed "s#IMAGE_PLACEHOLDER#ghcr.io/${{ github.repository_owner }}/soa-api:${{ github.sha }}#g" k8s/api/deployment.yaml | kubectl -n project-prj-1774037146422854262 apply --validate=false -f -
+          sed "s#IMAGE_PLACEHOLDER#${{ env.IMAGE }}#g" k8s/api/deployment.yaml | kubectl -n project-prj-1774037146422854262 apply --validate=false -f -
           kubectl -n project-prj-1774037146422854262 apply --validate=false -f k8s/api/service.yaml
