@@ -1,89 +1,47 @@
 name: Deploy Service
 
 on:
-	push:
-		branches:
-			- master
-	workflow_dispatch:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
 
 permissions:
-	contents: read
-	packages: write
+  contents: read
+  packages: write
 
 jobs:
-	build_and_deploy:
-		runs-on: ubuntu-latest
-		env:
-			YC_SERVICE_ACCOUNT_KEY_JSON: ${{ secrets.YC_SERVICE_ACCOUNT_KEY_JSON }}
-			YC_OAUTH_TOKEN: ${{ secrets.YC_OAUTH_TOKEN }}
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-		steps:
-			- name: Checkout
-				uses: actions/checkout@v4
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-			- name: Log in to GitHub Container Registry
-				uses: docker/login-action@v3
-				with:
-					registry: ghcr.io
-					username: ${{ github.actor }}
-					password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: hw1_c4/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/soa-api:${{ github.sha }}
 
-			- name: Build and push image
-				uses: docker/build-push-action@v6
-				with:
-					context: .
-					file: hw1_c4/Dockerfile
-					push: true
-					tags: ghcr.io/${{ github.repository_owner }}/soa-api:${{ github.sha }}
+      - name: Configure kubectl
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG_BASE64 }}" | base64 --decode > $HOME/.kube/config
 
-			- name: Configure kubectl
-				run: |
-					mkdir -p $HOME/.kube
-					echo "${{ secrets.KUBECONFIG_BASE64 }}" | base64 --decode > $HOME/.kube/config
+      - name: Set namespace
+        run: |
+          kubectl create namespace project-prj-1774037146422854262 --dry-run=client -o yaml | kubectl apply --validate=false -f -
 
-			- name: Install Yandex Cloud CLI
-				run: |
-					curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -i $HOME/yandex-cloud -n
-					echo "$HOME/yandex-cloud/bin" >> $GITHUB_PATH
-
-			- name: Configure Yandex Cloud profile
-				if: ${{ env.YC_SERVICE_ACCOUNT_KEY_JSON != '' || env.YC_OAUTH_TOKEN != '' }}
-				run: |
-					yc config profile create default || true
-					if [ -n "$YC_SERVICE_ACCOUNT_KEY_JSON" ]; then
-						printf '%s' "$YC_SERVICE_ACCOUNT_KEY_JSON" > $HOME/sa-key.json
-						yc config set service-account-key $HOME/sa-key.json
-					elif [ -n "$YC_OAUTH_TOKEN" ]; then
-						yc config set token "$YC_OAUTH_TOKEN"
-					fi
-
-			- name: Normalize kubeconfig exec command
-				run: |
-					CURRENT_CONTEXT=$(kubectl config current-context)
-					CURRENT_USER=$(kubectl config view -o jsonpath="{.contexts[?(@.name==\"$CURRENT_CONTEXT\")].context.user}")
-					kubectl config set-credentials "$CURRENT_USER" \
-						--exec-command=yc \
-						--exec-api-version=client.authentication.k8s.io/v1beta1 \
-						--exec-arg=managed-kubernetes \
-						--exec-arg=create-token
-
-			- name: Set namespace
-				run: |
-					for attempt in 1 2 3 4 5; do
-						kubectl create namespace project-prj-1774037146422854262 --dry-run=client -o yaml | kubectl apply --validate=false -f - && break
-						echo "namespace apply retry $attempt failed"
-						sleep 10
-					done
-
-			- name: Deploy manifests
-				run: |
-					for attempt in 1 2 3 4 5; do
-						sed "s#IMAGE_PLACEHOLDER#ghcr.io/${{ github.repository_owner }}/soa-api:${{ github.sha }}#g" k8s/api/deployment.yaml | kubectl -n project-prj-1774037146422854262 apply --validate=false -f - && break
-						echo "deployment apply retry $attempt failed"
-						sleep 10
-					done
-					for attempt in 1 2 3 4 5; do
-						kubectl -n project-prj-1774037146422854262 apply --validate=false -f k8s/api/service.yaml && break
-						echo "service apply retry $attempt failed"
-						sleep 10
-					done
+      - name: Deploy manifests
+        run: |
+          sed "s#IMAGE_PLACEHOLDER#ghcr.io/${{ github.repository_owner }}/soa-api:${{ github.sha }}#g" k8s/api/deployment.yaml | kubectl -n project-prj-1774037146422854262 apply --validate=false -f -
+          kubectl -n project-prj-1774037146422854262 apply --validate=false -f k8s/api/service.yaml
