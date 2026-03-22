@@ -8,7 +8,7 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  STAGE_SLUG: ${{ vars.STAGE_SLUG || 'production' }}
+  STAGE_SLUG: ${{ vars.STAGE_SLUG || 'test' }}
 
 permissions:
   contents: read
@@ -20,6 +20,7 @@ jobs:
     env:
       YC_SERVICE_ACCOUNT_KEY_JSON: ${{ secrets.YC_SERVICE_ACCOUNT_KEY_JSON }}
       YC_OAUTH_TOKEN: ${{ secrets.YC_OAUTH_TOKEN }}
+      YC_MANAGED_K8S_CLUSTER_ID: ${{ secrets.YC_MANAGED_K8S_CLUSTER_ID }}
 
     steps:
       - name: Checkout
@@ -66,6 +67,11 @@ jobs:
             yc config set token "$YC_OAUTH_TOKEN"
           fi
 
+      - name: Refresh kubeconfig from Yandex Cloud (optional)
+        if: ${{ env.YC_MANAGED_K8S_CLUSTER_ID != '' && (env.YC_SERVICE_ACCOUNT_KEY_JSON != '' || env.YC_OAUTH_TOKEN != '') }}
+        run: |
+          yc managed-kubernetes cluster get-credentials "$YC_MANAGED_K8S_CLUSTER_ID" --external --force
+
       - name: Normalize kubeconfig exec command
         run: |
           CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null || true)
@@ -88,6 +94,16 @@ jobs:
           else
             echo "Skipping kubeconfig exec normalization because no current user was found"
           fi
+
+      - name: Verify Kubernetes API connectivity
+        run: |
+          API_SERVER=$(kubectl config view --minify -o jsonpath="{.clusters[0].cluster.server}")
+          echo "Kubernetes API endpoint: $API_SERVER"
+          if ! kubectl --request-timeout=20s get --raw=/version > /tmp/k8s-version.json; then
+            echo "::error::Не удалось подключиться к Kubernetes API ($API_SERVER). Проверь, что kubeconfig указывает на внешний endpoint кластера, либо запускай деплой на self-hosted runner в той же сети."
+            exit 1
+          fi
+          cat /tmp/k8s-version.json
 
       - name: Ensure namespace exists
         run: |
