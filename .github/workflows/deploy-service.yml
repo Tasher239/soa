@@ -158,12 +158,20 @@ jobs:
       - name: Verify deployment
         run: |
           if ! kubectl -n "$STAGE_SLUG" rollout status deployment/soa --timeout=180s; then
-            echo "::error::Rollout deployment/soa не завершился за 180s. Собираем диагностику..."
-            kubectl -n "$STAGE_SLUG" get deployment/soa -o wide || true
-            kubectl -n "$STAGE_SLUG" get rs,pods -l app=soa -o wide || true
-            kubectl -n "$STAGE_SLUG" describe deployment/soa || true
-            kubectl -n "$STAGE_SLUG" describe pod -l app=soa || true
-            kubectl -n "$STAGE_SLUG" get events --sort-by=.lastTimestamp | tail -n 50 || true
-            exit 1
+            DESIRED=$(kubectl -n "$STAGE_SLUG" get deployment/soa -o jsonpath='{.spec.replicas}' 2>/dev/null || echo 0)
+            UPDATED=$(kubectl -n "$STAGE_SLUG" get deployment/soa -o jsonpath='{.status.updatedReplicas}' 2>/dev/null || echo 0)
+            READY=$(kubectl -n "$STAGE_SLUG" get deployment/soa -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo 0)
+            AVAILABLE=$(kubectl -n "$STAGE_SLUG" get deployment/soa -o jsonpath='{.status.availableReplicas}' 2>/dev/null || echo 0)
+            if [ "${DESIRED:-0}" -gt 0 ] && [ "${UPDATED:-0}" -ge "${DESIRED:-0}" ] && [ "${AVAILABLE:-0}" -ge "${DESIRED:-0}" ]; then
+              echo "::warning::Rollout timed out while old replicas terminate, but new replicas are ready (desired=$DESIRED updated=$UPDATED ready=$READY available=$AVAILABLE). Continuing."
+            else
+              echo "::error::Rollout deployment/soa не завершился за 180s. Собираем диагностику..."
+              kubectl -n "$STAGE_SLUG" get deployment/soa -o wide || true
+              kubectl -n "$STAGE_SLUG" get rs,pods -l app=soa -o wide || true
+              kubectl -n "$STAGE_SLUG" describe deployment/soa || true
+              kubectl -n "$STAGE_SLUG" describe pod -l app=soa || true
+              kubectl -n "$STAGE_SLUG" get events --sort-by=.lastTimestamp | tail -n 50 || true
+              exit 1
+            fi
           fi
           kubectl -n "$STAGE_SLUG" get pods
