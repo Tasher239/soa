@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: soa
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: soa
+  template:
+    metadata:
+      labels:
+        app: soa
+    spec:
+      containers:
+        - name: soa
+          image: IMAGE_PLACEHOLDER
+          ports:
+            - containerPort: 8000
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 15
