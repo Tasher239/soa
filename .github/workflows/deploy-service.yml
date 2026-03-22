@@ -8,6 +8,7 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  PROJECT_ID: prj-1774208445079669178
   STAGE_SLUG: ${{ vars.STAGE_SLUG || 'production' }}
 
 permissions:
@@ -119,6 +120,21 @@ jobs:
             exit 1
           fi
           cat /tmp/k8s-version.json
+
+      - name: Verify kubeconfig targets project vcluster
+        run: |
+          HOST_PROJECT_NAMESPACE="project-${PROJECT_ID}"
+          if kubectl get namespace "$HOST_PROJECT_NAMESPACE" >/dev/null 2>&1; then
+            echo "::error::KUBECONFIG указывает на host cluster (найден namespace $HOST_PROJECT_NAMESPACE). Для deploy нужен kubeconfig vcluster этого проекта."
+            echo "::error::Открой deploy-service UI -> Проект -> Доступ -> «Скопировать KUBECONFIG_BASE64» и обнови repository secret."
+            exit 1
+          fi
+
+          if kubectl get namespace -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep -q '^project-prj-'; then
+            echo "::error::KUBECONFIG похож на host cluster (видны namespace project-prj-*). Для deploy нужен kubeconfig vcluster проекта."
+            echo "::error::Используй секрет KUBECONFIG_BASE64 из кнопки «Скопировать KUBECONFIG_BASE64» в UI deploy-service."
+            exit 1
+          fi
 
       - name: Ensure namespace exists
         run: |
