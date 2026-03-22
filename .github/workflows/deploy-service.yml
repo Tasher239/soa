@@ -8,7 +8,7 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  STAGE_SLUG: ${{ vars.STAGE_SLUG || 'test' }}
+  STAGE_SLUG: ${{ vars.STAGE_SLUG || 'production' }}
 
 permissions:
   contents: read
@@ -25,6 +25,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Resolve IMAGE_NAME (lowercase owner)
+        run: |
+          OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_NAME=ghcr.io/${OWNER_LC}/soa-test-service:${GITHUB_SHA}" >> "$GITHUB_ENV"
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -38,7 +43,7 @@ jobs:
           context: hw1_c4
           file: hw1_c4/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/soa-test-service:${{ github.sha }}
+          tags: ${{ env.IMAGE_NAME }}
 
       - name: Configure kubectl
         run: |
@@ -116,7 +121,7 @@ jobs:
             echo "$description failed after 5 attempts"
             return 1
           }
-          retry_or_fail "deployment apply" sh -c 'sed "s#IMAGE_PLACEHOLDER#ghcr.io/${{ github.repository_owner }}/soa-test-service:${{ github.sha }}#g" k8s/test-service/deployment.yaml | kubectl -n "$STAGE_SLUG" apply --validate=false -f -'
+          retry_or_fail "deployment apply" sh -c 'sed "s#IMAGE_PLACEHOLDER#${IMAGE_NAME}#g" k8s/test-service/deployment.yaml | kubectl -n "$STAGE_SLUG" apply --validate=false -f -'
           retry_or_fail "service apply" kubectl -n "$STAGE_SLUG" apply --validate=false -f k8s/test-service/service.yaml
 
       - name: Verify deployment
