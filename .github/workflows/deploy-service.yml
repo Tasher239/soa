@@ -30,7 +30,7 @@ jobs:
       - name: Resolve IMAGE_NAME (lowercase owner)
         run: |
           OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          echo "IMAGE_NAME=ghcr.io/${OWNER_LC}/soa-soa:${GITHUB_SHA}" >> "$GITHUB_ENV"
+          echo "IMAGE_NAME=ghcr.io/${OWNER_LC}/soa-test-service:${GITHUB_SHA}" >> "$GITHUB_ENV"
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -152,10 +152,18 @@ jobs:
             echo "$description failed after 5 attempts"
             return 1
           }
-          retry_or_fail "deployment apply" sh -c 'sed "s#IMAGE_PLACEHOLDER#${IMAGE_NAME}#g" k8s/soa/deployment.yaml | kubectl -n "$STAGE_SLUG" apply --validate=false -f -'
-          retry_or_fail "service apply" kubectl -n "$STAGE_SLUG" apply --validate=false -f k8s/soa/service.yaml
+          retry_or_fail "deployment apply" sh -c 'sed "s#IMAGE_PLACEHOLDER#${IMAGE_NAME}#g" k8s/test-service/deployment.yaml | kubectl -n "$STAGE_SLUG" apply --validate=false -f -'
+          retry_or_fail "service apply" kubectl -n "$STAGE_SLUG" apply --validate=false -f k8s/test-service/service.yaml
 
       - name: Verify deployment
         run: |
-          kubectl -n "$STAGE_SLUG" rollout status deployment/soa --timeout=180s
+          if ! kubectl -n "$STAGE_SLUG" rollout status deployment/test-service --timeout=180s; then
+            echo "::error::Rollout deployment/test-service не завершился за 180s. Собираем диагностику..."
+            kubectl -n "$STAGE_SLUG" get deployment/test-service -o wide || true
+            kubectl -n "$STAGE_SLUG" get rs,pods -l app=test-service -o wide || true
+            kubectl -n "$STAGE_SLUG" describe deployment/test-service || true
+            kubectl -n "$STAGE_SLUG" describe pod -l app=test-service || true
+            kubectl -n "$STAGE_SLUG" get events --sort-by=.lastTimestamp | tail -n 50 || true
+            exit 1
+          fi
           kubectl -n "$STAGE_SLUG" get pods
