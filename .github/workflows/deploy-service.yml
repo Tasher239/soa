@@ -14,14 +14,14 @@ permissions:
   contents: read
   packages: write
 
-	jobs:
-	  build_and_deploy:
-	    runs-on: ubuntu-latest
-	    env:
-	      KUBECONFIG_BASE64: ${{ secrets.KUBECONFIG_BASE64 }}
-	      YC_SERVICE_ACCOUNT_KEY_JSON: ${{ secrets.YC_SERVICE_ACCOUNT_KEY_JSON }}
-	      YC_OAUTH_TOKEN: ${{ secrets.YC_OAUTH_TOKEN }}
-	      YC_MANAGED_K8S_CLUSTER_ID: ${{ secrets.YC_MANAGED_K8S_CLUSTER_ID }}
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    env:
+      KUBECONFIG_BASE64: ${{ secrets.KUBECONFIG_BASE64 }}
+      YC_SERVICE_ACCOUNT_KEY_JSON: ${{ secrets.YC_SERVICE_ACCOUNT_KEY_JSON }}
+      YC_OAUTH_TOKEN: ${{ secrets.YC_OAUTH_TOKEN }}
+      YC_MANAGED_K8S_CLUSTER_ID: ${{ secrets.YC_MANAGED_K8S_CLUSTER_ID }}
 
     steps:
       - name: Checkout
@@ -60,11 +60,11 @@ permissions:
           push: true
           tags: ${{ env.IMAGE_NAME }}
 
-	      - name: Configure kubectl
-	        if: ${{ env.KUBECONFIG_BASE64 != '' }}
-	        run: |
-	          mkdir -p $HOME/.kube
-	          echo "$KUBECONFIG_BASE64" | base64 --decode > $HOME/.kube/config
+      - name: Configure kubectl
+        if: ${{ env.KUBECONFIG_BASE64 != '' }}
+        run: |
+          mkdir -p $HOME/.kube
+          echo "$KUBECONFIG_BASE64" | base64 --decode > $HOME/.kube/config
 
       - name: Install Yandex Cloud CLI
         run: |
