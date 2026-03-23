@@ -8,7 +8,7 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  PROJECT_ID: prj-1774306329171076416
+  PROJECT_ID: prj-1774306689035818750
   STAGE_SLUG: ${{ vars.STAGE_SLUG || 'production' }}
 
 permissions:
