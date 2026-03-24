@@ -7,7 +7,7 @@ spec:
     - name: platform-gateway
       namespace: gateway
   hostnames:
-    - "prj-1774336864539647903.84.201.145.23.sslip.io"
+    - "prj-1774342013677038499.84.201.145.23.sslip.io"
   rules:
     - matches:
         - path:
@@ -15,4 +15,4 @@ spec:
             value: /
       backendRefs:
         - name: soa
-          port: 76
+          port: 80

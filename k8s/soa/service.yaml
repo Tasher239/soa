@@ -7,6 +7,6 @@ spec:
     app: soa
   ports:
     - protocol: TCP
-      port: 76
+      port: 80
       targetPort: 8000
   type: ClusterIP
