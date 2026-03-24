@@ -1,0 +1,18 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: soa
+spec:
+  parentRefs:
+    - name: platform-gateway
+      namespace: gateway
+  hostnames:
+    - "prj-1774336864539647903.84.201.145.23.sslip.io"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: soa
+          port: 76
