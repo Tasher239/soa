@@ -7,7 +7,7 @@ spec:
     - name: platform-gateway
       namespace: gateway
   hostnames:
-    - "prj-1774342013677038499.84.201.145.23.sslip.io"
+    - "prj-1774343099281643414.84.201.145.23.sslip.io"
   rules:
     - matches:
         - path:
