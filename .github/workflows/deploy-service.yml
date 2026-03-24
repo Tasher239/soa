@@ -8,7 +8,7 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  PROJECT_ID: prj-1774342013677038499
+  PROJECT_ID: prj-1774343099281643414
   STAGE_SLUG: ${{ vars.STAGE_SLUG || 'production' }}
 
 permissions:
@@ -152,7 +152,11 @@ jobs:
             return 1
           }
           retry_or_fail "namespace apply" sh -c 'kubectl create namespace "$STAGE_SLUG" --dry-run=client -o yaml | kubectl apply --validate=false -f -'
-k8s/soa/deployment.yaml
+
+      - name: Ensure Gateway API CRDs
+        run: |
+          kubectl get crd httproutes.gateway.networking.k8s.io >/dev/null 2>&1 || \
+            kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml --validate=false
       - name: Deploy manifests
         run: |
           retry_or_fail() {
@@ -168,12 +172,8 @@ k8s/soa/deployment.yaml
             echo "$description failed after 5 attempts"
             return 1
           }
-          retry_or_fail "deployment apply" sh -c 'sed "s#IMAGE_PLACEHOLDER#${IMAGE_NAME}#g" k8s/soa/service.yaml | kubectl -n "$STAGE_SLUG" apply --validate=false -f -'
-          retry_or_fail "service apply" kubectl -n "$STAGE_SLUG" apply --validate=false -f 
-      - name: Ensure Gateway API CRDs
-        run: |
-          kubectl get crd httproutes.gateway.networking.k8s.io >/dev/null 2>&1 || \
-            kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml --validate=false
+          retry_or_fail "deployment apply" sh -c 'sed "s#IMAGE_PLACEHOLDER#${IMAGE_NAME}#g" k8s/soa/deployment.yaml | kubectl -n "$STAGE_SLUG" apply --validate=false -f -'
+          retry_or_fail "service apply" kubectl -n "$STAGE_SLUG" apply --validate=false -f k8s/soa/service.yaml
           retry_or_fail "httproute apply" kubectl -n "$STAGE_SLUG" apply --validate=false -f k8s/soa/httproute.yaml
 
       - name: Verify deployment
