@@ -18,7 +18,7 @@ spec:
         - name: soa
           image: IMAGE_PLACEHOLDER
           ports:
-            - containerPort: 8000
+            - containerPort: 7998
           resources:
             requests:
               cpu: 100m
@@ -28,11 +28,11 @@ spec:
               memory: 512Mi
           readinessProbe:
             tcpSocket:
-              port: 8000
+              port: 7998
             initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
             tcpSocket:
-              port: 8000
+              port: 7998
             initialDelaySeconds: 20
             periodSeconds: 15
