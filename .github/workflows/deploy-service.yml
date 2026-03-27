@@ -8,7 +8,7 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  PROJECT_ID: prj-1774616432776783210
+  PROJECT_ID: prj-1774636488070296549
   STAGE_SLUG: ${{ vars.STAGE_SLUG || 'production' }}
 
 permissions:
@@ -173,13 +173,41 @@ jobs:
 
       - name: Verify deployment
         run: |
-          if ! kubectl -n "$STAGE_SLUG" rollout status deployment/soa --timeout=180s; then
+          # Run rollout status in the background; poll for crash states to fail fast.
+          kubectl -n "$STAGE_SLUG" rollout status deployment/soa --timeout=180s &
+          ROLLOUT_PID=$!
+          CRASHED=0
+          for _i in $(seq 1 36); do
+            sleep 5
+            if ! kill -0 "$ROLLOUT_PID" 2>/dev/null; then
+              break
+            fi
+            REASONS=$(kubectl -n "$STAGE_SLUG" get pods -l app=soa \
+              -o jsonpath='{range .items[*]}{range .status.containerStatuses[*]}{.state.waiting.reason}{"\n"}{.lastState.terminated.reason}{"\n"}{end}{end}' 2>/dev/null || true)
+            if echo "$REASONS" | grep -qE '^(CrashLoopBackOff|OOMKilled|ImagePullBackOff|ErrImagePull|CreateContainerConfigError)$'; then
+              CRASHED=1
+              kill "$ROLLOUT_PID" 2>/dev/null || true
+              wait "$ROLLOUT_PID" 2>/dev/null || true
+              break
+            fi
+          done
+          if [ "$CRASHED" = "1" ]; then
+            echo "::error::Pod упал (CrashLoopBackOff/OOMKilled/ImagePullBackOff). Собираем диагностику..."
+            kubectl -n "$STAGE_SLUG" get pods -l app=soa -o wide || true
+            kubectl -n "$STAGE_SLUG" describe pod -l app=soa || true
+            kubectl -n "$STAGE_SLUG" logs -l app=soa --tail=100 --previous 2>/dev/null \
+              || kubectl -n "$STAGE_SLUG" logs -l app=soa --tail=100 || true
+            kubectl -n "$STAGE_SLUG" get events --sort-by=.lastTimestamp | tail -n 30 || true
+            exit 1
+          fi
+          wait "$ROLLOUT_PID"
+          ROLLOUT_RC=$?
+          if [ "$ROLLOUT_RC" != "0" ]; then
             DESIRED=$(kubectl -n "$STAGE_SLUG" get deployment/soa -o jsonpath='{.spec.replicas}' 2>/dev/null || echo 0)
             UPDATED=$(kubectl -n "$STAGE_SLUG" get deployment/soa -o jsonpath='{.status.updatedReplicas}' 2>/dev/null || echo 0)
-            READY=$(kubectl -n "$STAGE_SLUG" get deployment/soa -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo 0)
             AVAILABLE=$(kubectl -n "$STAGE_SLUG" get deployment/soa -o jsonpath='{.status.availableReplicas}' 2>/dev/null || echo 0)
             if [ "${DESIRED:-0}" -gt 0 ] && [ "${UPDATED:-0}" -ge "${DESIRED:-0}" ] && [ "${AVAILABLE:-0}" -ge "${DESIRED:-0}" ]; then
-              echo "::warning::Rollout timed out while old replicas terminate, but new replicas are ready (desired=$DESIRED updated=$UPDATED ready=$READY available=$AVAILABLE). Continuing."
+              echo "::warning::Rollout timed out while old replicas terminate, but new replicas are ready. Continuing."
             else
               echo "::error::Rollout deployment/soa не завершился за 180s. Собираем диагностику..."
               kubectl -n "$STAGE_SLUG" get deployment/soa -o wide || true
