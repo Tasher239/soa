@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: soa
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: soa
+  template:
+    metadata:
+      labels:
+        app: soa
+    spec:
+      containers:
+        - name: soa
+          image: IMAGE_PLACEHOLDER
+          ports:
+            - containerPort: 7964
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            tcpSocket:
+              port: 7964
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 7964
+            initialDelaySeconds: 20
+            periodSeconds: 15
