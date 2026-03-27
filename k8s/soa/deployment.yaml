@@ -5,7 +5,7 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: soa
