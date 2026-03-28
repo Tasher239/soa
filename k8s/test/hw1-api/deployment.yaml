@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hw1-api
+  labels:
+    deploy-service.io/stage: test
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hw1-api
+  template:
+    metadata:
+      labels:
+        app: hw1-api
+        deploy-service.io/stage: test
+    spec:
+      containers:
+        - name: hw1-api
+          image: IMAGE_PLACEHOLDER
+          ports:
+            - containerPort: 8000
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 15
