@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hw1-api
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: "prj-1774707120801205500.158.160.243.112.nip.io"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hw1-api
+                port:
+                  number: 80
