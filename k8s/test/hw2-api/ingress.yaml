@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hw2-api
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: "hw2-api.prj-1774800094094665788.test.158.160.241.48.sslip.io"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hw2-api
+                port:
+                  number: 80
