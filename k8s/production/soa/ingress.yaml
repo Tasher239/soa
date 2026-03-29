@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: soa
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: "soa.prj-1774811052023415667.158.160.223.165.nip.io"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: soa
+                port:
+                  number: 80
