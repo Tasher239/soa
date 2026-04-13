@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hw2-openapi-crud-dockerfile
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: "hw2-openapi-crud-dockerfile.346a6e41-6b8a-4d2f-b638-3e93ee87f46c.test.158.160.241.48.sslip.io"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hw2-openapi-crud-dockerfile
+                port:
+                  number: 80
