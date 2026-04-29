@@ -1,0 +1,28 @@
+[project]
+name = "cinema-tests"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.27",
+    "clickhouse-connect>=0.8",
+    "asyncpg>=0.29",
+    "aioboto3>=13.2",
+    "pyarrow>=18.0",
+    "docker>=7.1",
+    "orjson>=3.10",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tests*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["."]
+addopts = "-ra -v --tb=short"
