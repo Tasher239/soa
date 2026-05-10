@@ -1,0 +1,23 @@
+[project]
+name = "warehouse-consumer"
+version = "0.1.0"
+description = "Stateful Kafka consumer that materializes warehouse state into Cassandra"
+requires-python = ">=3.12"
+dependencies = [
+  "confluent-kafka[avro,schemaregistry]==2.6.1",
+  "fastavro==1.9.7",
+  "cassandra-driver==3.29.2",
+  "fastapi==0.115.4",
+  "uvicorn[standard]==0.32.0",
+  "prometheus-client==0.21.0",
+  "pydantic==2.9.2",
+  "pydantic-settings==2.6.1",
+  "structlog==24.4.0",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]

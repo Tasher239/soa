@@ -1,0 +1,10 @@
+{
+  "type": "record",
+  "name": "OrderCompleted",
+  "namespace": "com.warehouse.events",
+  "fields": [
+    {"name": "event_id", "type": "string"},
+    {"name": "timestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "order_id", "type": "string"}
+  ]
+}

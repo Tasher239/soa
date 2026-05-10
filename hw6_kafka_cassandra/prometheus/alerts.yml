@@ -1,0 +1,29 @@
+groups:
+  - name: warehouse-consumer
+    rules:
+      - alert: HighConsumerLag
+        expr: max by (partition) (consumer_lag) > 100
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Warehouse consumer lag is high"
+          description: "Partition {{ $labels.partition }} lag {{ $value }} exceeds 100 messages for >30s"
+
+      - alert: CassandraWriteErrorsBurst
+        expr: increase(cassandra_write_errors_total[1m]) > 5
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Cassandra write errors detected"
+          description: "More than 5 Cassandra write errors in the last minute"
+
+      - alert: ConsumerDown
+        expr: up{job="warehouse-consumer"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Warehouse consumer is down"
+          description: "Prometheus cannot scrape consumer /metrics for >1m"

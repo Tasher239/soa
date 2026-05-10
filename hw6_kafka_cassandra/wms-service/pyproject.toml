@@ -1,0 +1,20 @@
+[project]
+name = "warehouse-wms"
+version = "0.1.0"
+description = "Producer of warehouse domain events"
+requires-python = ">=3.12"
+dependencies = [
+  "confluent-kafka[avro,schemaregistry]==2.6.1",
+  "fastavro==1.9.7",
+  "fastapi==0.115.4",
+  "uvicorn[standard]==0.32.0",
+  "pydantic==2.9.2",
+  "pydantic-settings==2.6.1",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
