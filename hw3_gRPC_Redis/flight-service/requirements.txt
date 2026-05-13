@@ -1,0 +1,8 @@
+grpcio==1.78.0
+grpcio-tools==1.78.0
+protobuf==6.33.5
+sqlalchemy[asyncio]==2.0.29
+asyncpg==0.29.0
+alembic==1.13.1
+redis==5.0.4
+pydantic-settings==2.2.1
