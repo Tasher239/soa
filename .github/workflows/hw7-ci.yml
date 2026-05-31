@@ -81,7 +81,7 @@ jobs:
       - name: Install test dependencies
         run: |
           pip install --no-cache-dir services/shared/
-          pip install --no-cache-dir httpx pytest pytest-asyncio clickhouse-connect asyncpg "confluent-kafka[avro,schemaregistry]"
+          pip install --no-cache-dir httpx pytest pytest-asyncio "clickhouse-connect[async]" aiohttp asyncpg "confluent-kafka[avro,schemaregistry]"
 
       - name: Run integration tests
         run: pytest tests/integration -v --tb=short --junit-xml=integration-results.xml
@@ -134,7 +134,7 @@ jobs:
       - name: Install test dependencies
         run: |
           pip install --no-cache-dir services/shared/
-          pip install --no-cache-dir httpx pytest pytest-asyncio clickhouse-connect asyncpg
+          pip install --no-cache-dir httpx pytest pytest-asyncio "clickhouse-connect[async]" aiohttp asyncpg
 
       - name: Run E2E tests
         run: pytest tests/e2e -v --tb=short --junit-xml=e2e-results.xml
