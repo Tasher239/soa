@@ -2,7 +2,14 @@ name: CI — Cinema Observability
 
 on:
   push:
+    branches:
+      - master
+      - main
+      - 'hw7_**'
   pull_request:
+    branches:
+      - master
+      - main
 
 concurrency:
   group: ci-${{ github.ref }}

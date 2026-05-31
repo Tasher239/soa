@@ -43,7 +43,6 @@ class ClickHouseGateway:
                         password=settings.clickhouse_password,
                         database=settings.clickhouse_database,
                         interface="http",
-                        pool_mgr=None,
                     )
         except Exception as exc:
             raise ClickHouseUnavailable(f"clickhouse_connect_failed: {exc}") from exc
