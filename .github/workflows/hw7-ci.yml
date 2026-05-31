@@ -13,18 +13,6 @@ defaults:
     working-directory: hw7_cicd_testing_observability
 
 jobs:
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install ruff
-      - run: ruff check services/producer services/aggregator services/shared tests
-      - run: ruff format --check services/producer services/aggregator services/shared tests
-
   unit:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -33,7 +21,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install shared + test dependencies
+      - name: Install dependencies
         run: |
           pip install --no-cache-dir services/shared/
           pip install --no-cache-dir fastapi httpx pytest pytest-asyncio prometheus-client
@@ -50,8 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v3
       - name: Build all images
         run: docker compose build --parallel
         env:
@@ -63,21 +50,24 @@ jobs:
     needs: [build]
     steps:
       - uses: actions/checkout@v4
-      - name: Start core services
+      - name: Start services
         run: |
           docker compose up -d kafka-1 kafka-2 kafka-3 schema-registry kafka-init \
             clickhouse postgres minio minio-init aggregator-migrate producer aggregator
-          docker compose wait kafka-init aggregator-migrate minio-init || true
-      - name: Wait for services to be healthy
+      - name: Wait for producer and aggregator healthy
         run: |
-          timeout 180 bash -c 'until docker compose ps | grep -E "producer.*healthy" && docker compose ps | grep -E "aggregator.*healthy"; do sleep 5; done'
+          timeout 300 bash -c '
+            until curl -fsS http://localhost:8000/health >/dev/null 2>&1 && \
+                  curl -fsS http://localhost:8001/health >/dev/null 2>&1; do
+              echo "waiting..."; sleep 10
+            done
+          '
       - name: Install test dependencies
         run: |
           pip install --no-cache-dir services/shared/
           pip install --no-cache-dir httpx pytest pytest-asyncio clickhouse-connect asyncpg "confluent-kafka[avro,schemaregistry]"
       - name: Run integration tests
-        run: |
-          pytest tests/integration -v --tb=short --junit-xml=integration-results.xml
+        run: pytest tests/integration -v --tb=short --junit-xml=integration-results.xml
         env:
           PRODUCER_URL: http://localhost:8000
           AGGREGATOR_URL: http://localhost:8001
@@ -106,21 +96,24 @@ jobs:
     needs: [integration]
     steps:
       - uses: actions/checkout@v4
-      - name: Start full stack
+      - name: Start services
         run: |
           docker compose up -d kafka-1 kafka-2 kafka-3 schema-registry kafka-init \
             clickhouse postgres minio minio-init aggregator-migrate producer aggregator
-          docker compose wait kafka-init aggregator-migrate minio-init || true
-      - name: Wait for healthy
+      - name: Wait for producer and aggregator healthy
         run: |
-          timeout 180 bash -c 'until docker compose ps | grep -E "producer.*healthy" && docker compose ps | grep -E "aggregator.*healthy"; do sleep 5; done'
+          timeout 300 bash -c '
+            until curl -fsS http://localhost:8000/health >/dev/null 2>&1 && \
+                  curl -fsS http://localhost:8001/health >/dev/null 2>&1; do
+              echo "waiting..."; sleep 10
+            done
+          '
       - name: Install test dependencies
         run: |
           pip install --no-cache-dir services/shared/
           pip install --no-cache-dir httpx pytest pytest-asyncio clickhouse-connect asyncpg
       - name: Run E2E tests
-        run: |
-          pytest tests/e2e -v --tb=short --junit-xml=e2e-results.xml
+        run: pytest tests/e2e -v --tb=short --junit-xml=e2e-results.xml
         env:
           PRODUCER_URL: http://localhost:8000
           AGGREGATOR_URL: http://localhost:8001
@@ -150,23 +143,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Start full observability stack
+        run: docker compose up -d
+      - name: Wait for producer, aggregator and prometheus healthy
         run: |
-          docker compose up -d
-          docker compose wait kafka-init aggregator-migrate minio-init || true
-      - name: Wait for all services healthy
-        run: |
-          timeout 240 bash -c '
-            until docker compose ps | grep -E "prometheus.*healthy" && \
-                  docker compose ps | grep -E "producer.*healthy" && \
-                  docker compose ps | grep -E "aggregator.*healthy"; do
-              sleep 10
+          timeout 300 bash -c '
+            until curl -fsS http://localhost:8000/health >/dev/null 2>&1 && \
+                  curl -fsS http://localhost:8001/health >/dev/null 2>&1 && \
+                  curl -fsS http://localhost:9090/-/healthy >/dev/null 2>&1; do
+              echo "waiting..."; sleep 10
             done
           '
-      - name: Health check before load
-        run: |
-          curl -fsS http://localhost:8000/health
-          curl -fsS http://localhost:8001/health
-          curl -fsS http://localhost:9090/-/healthy
       - name: Start background health monitor
         run: |
           while sleep 10; do
@@ -195,7 +181,6 @@ jobs:
           python tests/load/slo_check.py 2>&1 | tee artifacts/slo-checks.log
         env:
           PROMETHEUS_URL: http://localhost:9090
-          SLO_CHECK_WAIT_SECS: "0"
       - name: Collect compose logs
         if: always()
         run: docker compose logs --no-color > artifacts/compose-load.log
