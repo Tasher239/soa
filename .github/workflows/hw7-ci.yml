@@ -50,22 +50,41 @@ jobs:
     needs: [build]
     steps:
       - uses: actions/checkout@v4
+
       - name: Start services
         run: |
           docker compose up -d kafka-1 kafka-2 kafka-3 schema-registry kafka-init \
             clickhouse postgres minio minio-init aggregator-migrate producer aggregator
-      - name: Wait for producer and aggregator healthy
+
+      - name: Wait for producer healthy
         run: |
           timeout 300 bash -c '
-            until curl -fsS http://localhost:8000/health >/dev/null 2>&1 && \
-                  curl -fsS http://localhost:8001/health >/dev/null 2>&1; do
-              echo "waiting..."; sleep 10
+            until curl -fsS http://localhost:8000/health >/dev/null 2>&1; do
+              echo "waiting for producer..."; sleep 10
             done
           '
+
+      - name: Wait for aggregator ready
+        run: |
+          timeout 300 bash -c '
+            until curl -fsS http://localhost:8001/ready >/dev/null 2>&1; do
+              echo "waiting for aggregator..."; sleep 10
+            done
+          '
+
+      - name: Show aggregator health status and logs
+        run: |
+          echo "=== aggregator /health ==="
+          curl -s http://localhost:8001/health || true
+          echo ""
+          echo "=== aggregator logs ==="
+          docker compose logs aggregator --tail 30
+
       - name: Install test dependencies
         run: |
           pip install --no-cache-dir services/shared/
           pip install --no-cache-dir httpx pytest pytest-asyncio clickhouse-connect asyncpg "confluent-kafka[avro,schemaregistry]"
+
       - name: Run integration tests
         run: pytest tests/integration -v --tb=short --junit-xml=integration-results.xml
         env:
@@ -73,12 +92,14 @@ jobs:
           AGGREGATOR_URL: http://localhost:8001
           CLICKHOUSE_HOST: localhost
           CLICKHOUSE_PORT: "8123"
-          POSTGRES_DSN: "postgresql://cinema:cinema@localhost:5433/cinema"
+          POSTGRES_DSN: "[Secrets76]:[Secrets77]:[Secrets78]:[Secrets79]/cinema"
           KAFKA_BOOTSTRAP_SERVERS: "localhost:19092"
           SCHEMA_REGISTRY_URL: http://localhost:8081
+
       - name: Collect logs on failure
         if: failure()
         run: docker compose logs --no-color > compose-integration.log
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -86,6 +107,7 @@ jobs:
           path: |
             hw7_cicd_testing_observability/integration-results.xml
             hw7_cicd_testing_observability/compose-integration.log
+
       - name: Stop services
         if: always()
         run: docker compose down -v
@@ -96,22 +118,41 @@ jobs:
     needs: [integration]
     steps:
       - uses: actions/checkout@v4
+
       - name: Start services
         run: |
           docker compose up -d kafka-1 kafka-2 kafka-3 schema-registry kafka-init \
             clickhouse postgres minio minio-init aggregator-migrate producer aggregator
-      - name: Wait for producer and aggregator healthy
+
+      - name: Wait for producer healthy
         run: |
           timeout 300 bash -c '
-            until curl -fsS http://localhost:8000/health >/dev/null 2>&1 && \
-                  curl -fsS http://localhost:8001/health >/dev/null 2>&1; do
-              echo "waiting..."; sleep 10
+            until curl -fsS http://localhost:8000/health >/dev/null 2>&1; do
+              echo "waiting for producer..."; sleep 10
             done
           '
+
+      - name: Wait for aggregator ready
+        run: |
+          timeout 300 bash -c '
+            until curl -fsS http://localhost:8001/ready >/dev/null 2>&1; do
+              echo "waiting for aggregator..."; sleep 10
+            done
+          '
+
+      - name: Show aggregator health status and logs
+        run: |
+          echo "=== aggregator /health ==="
+          curl -s http://localhost:8001/health || true
+          echo ""
+          echo "=== aggregator logs ==="
+          docker compose logs aggregator --tail 30
+
       - name: Install test dependencies
         run: |
           pip install --no-cache-dir services/shared/
           pip install --no-cache-dir httpx pytest pytest-asyncio clickhouse-connect asyncpg
+
       - name: Run E2E tests
         run: pytest tests/e2e -v --tb=short --junit-xml=e2e-results.xml
         env:
@@ -119,12 +160,14 @@ jobs:
           AGGREGATOR_URL: http://localhost:8001
           CLICKHOUSE_HOST: localhost
           CLICKHOUSE_PORT: "8123"
-          POSTGRES_DSN: "postgresql://cinema:cinema@localhost:5433/cinema"
+          POSTGRES_DSN: "[Secrets80]:[Secrets81]:[Secrets82]:[Secrets83]/cinema"
           KAFKA_BOOTSTRAP_SERVERS: "localhost:19092"
           SCHEMA_REGISTRY_URL: http://localhost:8081
+
       - name: Collect logs on failure
         if: failure()
         run: docker compose logs --no-color > compose-e2e.log
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -132,6 +175,7 @@ jobs:
           path: |
             hw7_cicd_testing_observability/e2e-results.xml
             hw7_cicd_testing_observability/compose-e2e.log
+
       - name: Stop services
         if: always()
         run: docker compose down -v
@@ -142,23 +186,34 @@ jobs:
     needs: [e2e]
     steps:
       - uses: actions/checkout@v4
+
       - name: Start full observability stack
         run: docker compose up -d
-      - name: Wait for producer, aggregator and prometheus healthy
+
+      - name: Wait for producer healthy
         run: |
           timeout 300 bash -c '
-            until curl -fsS http://localhost:8000/health >/dev/null 2>&1 && \
-                  curl -fsS http://localhost:8001/health >/dev/null 2>&1 && \
+            until curl -fsS http://localhost:8000/health >/dev/null 2>&1; do
+              echo "waiting for producer..."; sleep 10
+            done
+          '
+
+      - name: Wait for aggregator and prometheus ready
+        run: |
+          timeout 300 bash -c '
+            until curl -fsS http://localhost:8001/ready >/dev/null 2>&1 && \
                   curl -fsS http://localhost:9090/-/healthy >/dev/null 2>&1; do
               echo "waiting..."; sleep 10
             done
           '
+
       - name: Start background health monitor
         run: |
           while sleep 10; do
             curl -fsS http://localhost:8000/health >/dev/null || { echo "HEALTH CHECK FAILED"; exit 1; }
           done &
           echo $! > /tmp/health_monitor.pid
+
       - name: Run k6 load test
         run: |
           mkdir -p artifacts
@@ -170,25 +225,31 @@ jobs:
             -w /out \
             grafana/k6:0.55.0 run /scripts/k6_load.js \
             --out json=/out/k6-raw.json
+
       - name: Stop health monitor
         if: always()
         run: kill $(cat /tmp/health_monitor.pid) 2>/dev/null || true
+
       - name: Wait for Prometheus to collect post-load metrics
         run: sleep 30
+
       - name: Run SLO checks
         run: |
           pip install httpx
           python tests/load/slo_check.py 2>&1 | tee artifacts/slo-checks.log
         env:
           PROMETHEUS_URL: http://localhost:9090
+
       - name: Collect compose logs
         if: always()
         run: docker compose logs --no-color > artifacts/compose-load.log
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: load-and-slo-results
           path: hw7_cicd_testing_observability/artifacts/
+
       - name: Stop services
         if: always()
         run: docker compose down -v
