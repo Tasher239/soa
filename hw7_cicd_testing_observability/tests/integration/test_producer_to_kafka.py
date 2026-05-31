@@ -1,5 +1,7 @@
+"""Integration test: POST /events → Avro message arrives in Kafka topic."""
 from __future__ import annotations
 
+import time
 import uuid
 
 import httpx
@@ -11,6 +13,20 @@ from confluent_kafka.serialization import MessageField, SerializationContext
 
 from conftest import KAFKA_BOOTSTRAP_SERVERS, PRODUCER_URL, SCHEMA_REGISTRY_URL, unique_id
 
+TOPIC = "movie-events"
+
+
+def _wait_for_assignment(consumer: Consumer, deadline_sec: float = 30.0) -> None:
+    """Subscribe + poll until partitions are assigned (rebalance done)."""
+    deadline = time.time() + deadline_sec
+    while time.time() < deadline:
+        consumer.poll(timeout=0.5)
+        if consumer.assignment():
+            return
+    raise AssertionError(
+        f"Consumer did not get partition assignment for topic '{TOPIC}' within {deadline_sec}s"
+    )
+
 
 @pytest.fixture
 def avro_consumer():
@@ -20,25 +36,37 @@ def avro_consumer():
     c = Consumer({
         "bootstrap.servers": KAFKA_BOOTSTRAP_SERVERS,
         "group.id": group_id,
-        "auto.offset.reset": "earliest",
+        # 'latest' so we don't drown in old events from the producer generator
+        "auto.offset.reset": "latest",
         "enable.auto.commit": False,
+        "session.timeout.ms": 10000,
     })
-    c.subscribe(["movie-events"])
+    c.subscribe([TOPIC])
+    _wait_for_assignment(c)
     yield c, deserializer
     c.close()
 
 
-def _poll_avro(consumer: Consumer, deserializer: AvroDeserializer, timeout_iters: int = 60):
-    """Yield deserialized dicts from movie-events until timeout."""
-    for _ in range(timeout_iters):
+def _poll_avro_until_found(
+    consumer: Consumer,
+    deserializer: AvroDeserializer,
+    predicate,
+    timeout_sec: float = 60.0,
+):
+    """Poll until predicate(value) returns truthy. Returns the matching value or None."""
+    deadline = time.time() + timeout_sec
+    while time.time() < deadline:
         msg = consumer.poll(timeout=1.0)
         if msg is None or msg.error():
             continue
         ctx = SerializationContext(msg.topic(), MessageField.VALUE)
-        value = deserializer(msg.value(), ctx)
-        if value is None:
+        try:
+            value = deserializer(msg.value(), ctx)
+        except Exception:
             continue
-        yield value
+        if value is not None and predicate(value):
+            return value
+    return None
 
 
 @pytest.mark.asyncio
@@ -61,16 +89,16 @@ async def test_published_event_reaches_kafka(avro_consumer):
     event_id = r.json()["event_id"]
     assert uuid.UUID(event_id)
 
-    found = False
-    for value in _poll_avro(consumer, deserializer, timeout_iters=90):
-        if value.get("user_id") == user_id and value.get("movie_id") == movie_id:
-            assert value["event_type"] == "VIEW_STARTED"
-            assert value["device_type"] == "MOBILE"
-            assert value["event_id"] == event_id
-            found = True
-            break
-
-    assert found, f"Event for user={user_id} movie={movie_id} not found in Kafka"
+    found = _poll_avro_until_found(
+        consumer,
+        deserializer,
+        predicate=lambda v: v.get("user_id") == user_id and v.get("movie_id") == movie_id,
+        timeout_sec=60.0,
+    )
+    assert found is not None, f"Event user={user_id} not found in Kafka within 60s"
+    assert found["event_type"] == "VIEW_STARTED"
+    assert found["device_type"] == "MOBILE"
+    assert found["event_id"] == event_id
 
 
 @pytest.mark.asyncio
@@ -96,10 +124,19 @@ async def test_batch_publish_all_reach_kafka(avro_consumer):
     assert body["succeeded"] == 5
 
     seen_user_ids: set[str] = set()
-    for value in _poll_avro(consumer, deserializer, timeout_iters=120):
-        if value.get("movie_id") == expected_movie:
+    deadline = time.time() + 90.0
+    while time.time() < deadline and len(seen_user_ids) < 5:
+        msg = consumer.poll(timeout=1.0)
+        if msg is None or msg.error():
+            continue
+        ctx = SerializationContext(msg.topic(), MessageField.VALUE)
+        try:
+            value = deserializer(msg.value(), ctx)
+        except Exception:
+            continue
+        if value and value.get("movie_id") == expected_movie:
             seen_user_ids.add(value.get("user_id"))
-            if len(seen_user_ids) >= 5:
-                break
 
-    assert len(seen_user_ids) >= 5, f"Only {len(seen_user_ids)}/5 batch events found in Kafka"
+    assert len(seen_user_ids) >= 5, (
+        f"Only {len(seen_user_ids)}/5 batch events found in Kafka. Seen: {seen_user_ids}"
+    )
