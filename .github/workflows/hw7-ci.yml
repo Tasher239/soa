@@ -1,0 +1,209 @@
+name: CI — Cinema Observability
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: hw7_cicd_testing_observability
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check services/producer services/aggregator services/shared tests
+      - run: ruff format --check services/producer services/aggregator services/shared tests
+
+  unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install shared + test dependencies
+        run: |
+          pip install --no-cache-dir services/shared/
+          pip install --no-cache-dir fastapi httpx pytest pytest-asyncio prometheus-client
+      - name: Run unit tests
+        run: pytest tests/unit -v --tb=short --junit-xml=unit-results.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-test-results
+          path: hw7_cicd_testing_observability/unit-results.xml
+
+  build:
+    name: Build Images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build all images
+        run: docker compose build --parallel
+        env:
+          DOCKER_BUILDKIT: 1
+
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start core services
+        run: |
+          docker compose up -d kafka-1 kafka-2 kafka-3 schema-registry kafka-init \
+            clickhouse postgres minio minio-init aggregator-migrate producer aggregator
+          docker compose wait kafka-init aggregator-migrate minio-init || true
+      - name: Wait for services to be healthy
+        run: |
+          timeout 180 bash -c 'until docker compose ps | grep -E "producer.*healthy" && docker compose ps | grep -E "aggregator.*healthy"; do sleep 5; done'
+      - name: Install test dependencies
+        run: |
+          pip install --no-cache-dir services/shared/
+          pip install --no-cache-dir httpx pytest pytest-asyncio clickhouse-connect asyncpg "confluent-kafka[avro,schemaregistry]"
+      - name: Run integration tests
+        run: |
+          pytest tests/integration -v --tb=short --junit-xml=integration-results.xml
+        env:
+          PRODUCER_URL: http://localhost:8000
+          AGGREGATOR_URL: http://localhost:8001
+          CLICKHOUSE_HOST: localhost
+          CLICKHOUSE_PORT: "8123"
+          POSTGRES_DSN: "postgresql://cinema:cinema@localhost:5433/cinema"
+          KAFKA_BOOTSTRAP_SERVERS: "localhost:19092"
+          SCHEMA_REGISTRY_URL: http://localhost:8081
+      - name: Collect logs on failure
+        if: failure()
+        run: docker compose logs --no-color > compose-integration.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-results
+          path: |
+            hw7_cicd_testing_observability/integration-results.xml
+            hw7_cicd_testing_observability/compose-integration.log
+      - name: Stop services
+        if: always()
+        run: docker compose down -v
+
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: [integration]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start full stack
+        run: |
+          docker compose up -d kafka-1 kafka-2 kafka-3 schema-registry kafka-init \
+            clickhouse postgres minio minio-init aggregator-migrate producer aggregator
+          docker compose wait kafka-init aggregator-migrate minio-init || true
+      - name: Wait for healthy
+        run: |
+          timeout 180 bash -c 'until docker compose ps | grep -E "producer.*healthy" && docker compose ps | grep -E "aggregator.*healthy"; do sleep 5; done'
+      - name: Install test dependencies
+        run: |
+          pip install --no-cache-dir services/shared/
+          pip install --no-cache-dir httpx pytest pytest-asyncio clickhouse-connect asyncpg
+      - name: Run E2E tests
+        run: |
+          pytest tests/e2e -v --tb=short --junit-xml=e2e-results.xml
+        env:
+          PRODUCER_URL: http://localhost:8000
+          AGGREGATOR_URL: http://localhost:8001
+          CLICKHOUSE_HOST: localhost
+          CLICKHOUSE_PORT: "8123"
+          POSTGRES_DSN: "postgresql://cinema:cinema@localhost:5433/cinema"
+          KAFKA_BOOTSTRAP_SERVERS: "localhost:19092"
+          SCHEMA_REGISTRY_URL: http://localhost:8081
+      - name: Collect logs on failure
+        if: failure()
+        run: docker compose logs --no-color > compose-e2e.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-results
+          path: |
+            hw7_cicd_testing_observability/e2e-results.xml
+            hw7_cicd_testing_observability/compose-e2e.log
+      - name: Stop services
+        if: always()
+        run: docker compose down -v
+
+  load-and-slo:
+    name: Load Test + SLO Check
+    runs-on: ubuntu-latest
+    needs: [e2e]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start full observability stack
+        run: |
+          docker compose up -d
+          docker compose wait kafka-init aggregator-migrate minio-init || true
+      - name: Wait for all services healthy
+        run: |
+          timeout 240 bash -c '
+            until docker compose ps | grep -E "prometheus.*healthy" && \
+                  docker compose ps | grep -E "producer.*healthy" && \
+                  docker compose ps | grep -E "aggregator.*healthy"; do
+              sleep 10
+            done
+          '
+      - name: Health check before load
+        run: |
+          curl -fsS http://localhost:8000/health
+          curl -fsS http://localhost:8001/health
+          curl -fsS http://localhost:9090/-/healthy
+      - name: Start background health monitor
+        run: |
+          while sleep 10; do
+            curl -fsS http://localhost:8000/health >/dev/null || { echo "HEALTH CHECK FAILED"; exit 1; }
+          done &
+          echo $! > /tmp/health_monitor.pid
+      - name: Run k6 load test
+        run: |
+          mkdir -p artifacts
+          docker run --rm \
+            --network host \
+            -e PRODUCER_URL=http://localhost:8000 \
+            -v "$PWD/tests/load:/scripts" \
+            -v "$PWD/artifacts:/out" \
+            -w /out \
+            grafana/k6:0.55.0 run /scripts/k6_load.js \
+            --out json=/out/k6-raw.json
+      - name: Stop health monitor
+        if: always()
+        run: kill $(cat /tmp/health_monitor.pid) 2>/dev/null || true
+      - name: Wait for Prometheus to collect post-load metrics
+        run: sleep 30
+      - name: Run SLO checks
+        run: |
+          pip install httpx
+          python tests/load/slo_check.py 2>&1 | tee artifacts/slo-checks.log
+        env:
+          PROMETHEUS_URL: http://localhost:9090
+          SLO_CHECK_WAIT_SECS: "0"
+      - name: Collect compose logs
+        if: always()
+        run: docker compose logs --no-color > artifacts/compose-load.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: load-and-slo-results
+          path: hw7_cicd_testing_observability/artifacts/
+      - name: Stop services
+        if: always()
+        run: docker compose down -v
