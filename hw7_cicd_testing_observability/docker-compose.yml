@@ -146,11 +146,14 @@ services:
       - ./infra/clickhouse/init:/docker-entrypoint-initdb.d:ro
       - ./infra/clickhouse/config/config.d:/etc/clickhouse-server/config.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8123/ping >/dev/null 2>&1"]
+      # /ping отвечает сразу, но init-скрипты ещё не завершены — таблиц нет.
+      # Проверяем что cinema.events существует: wget выходит 0 (HTTP 200) если таблица есть,
+      # и 8 (HTTP 500) если нет. Aggregator стартует только после этого.
+      test: ["CMD-SHELL", "wget -qO- 'http://127.0.0.1:8123/?query=SELECT+1+FROM+cinema.events+LIMIT+0' >/dev/null 2>&1"]
       interval: 10s
-      timeout: 5s
-      retries: 15
-      start_period: 20s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
     restart: unless-stopped
 
   postgres:
@@ -279,7 +282,7 @@ services:
     ports:
       - "8001:8001"
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8001/ready >/dev/null"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8001/health >/dev/null"]
       interval: 10s
       timeout: 5s
       retries: 20

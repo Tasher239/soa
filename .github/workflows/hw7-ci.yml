@@ -56,29 +56,20 @@ jobs:
           docker compose up -d kafka-1 kafka-2 kafka-3 schema-registry kafka-init \
             clickhouse postgres minio minio-init aggregator-migrate producer aggregator
 
-      - name: Wait for producer healthy
+      - name: Wait for producer and aggregator healthy
         run: |
-          timeout 300 bash -c '
-            until curl -fsS http://localhost:8000/health >/dev/null 2>&1; do
-              echo "waiting for producer..."; sleep 10
+          timeout 360 bash -c '
+            until curl -fsS http://localhost:8000/health >/dev/null 2>&1 && \
+                  curl -fsS http://localhost:8001/health >/dev/null 2>&1; do
+              echo "waiting..."; sleep 10
             done
           '
 
-      - name: Wait for aggregator ready
+      - name: Show aggregator health and logs
+        if: always()
         run: |
-          timeout 300 bash -c '
-            until curl -fsS http://localhost:8001/ready >/dev/null 2>&1; do
-              echo "waiting for aggregator..."; sleep 10
-            done
-          '
-
-      - name: Show aggregator health status and logs
-        run: |
-          echo "=== aggregator /health ==="
-          curl -s http://localhost:8001/health || true
-          echo ""
-          echo "=== aggregator logs ==="
-          docker compose logs aggregator --tail 30
+          echo "=== aggregator /health ==="; curl -s http://localhost:8001/health || true
+          echo ""; echo "=== aggregator logs ==="; docker compose logs aggregator --tail 40
 
       - name: Install test dependencies
         run: |
@@ -92,7 +83,7 @@ jobs:
           AGGREGATOR_URL: http://localhost:8001
           CLICKHOUSE_HOST: localhost
           CLICKHOUSE_PORT: "8123"
-          POSTGRES_DSN: "[Secrets76]:[Secrets77]:[Secrets78]:[Secrets79]/cinema"
+          POSTGRES_DSN: "[Secrets84]:[Secrets85]:[Secrets86]:[Secrets87]/cinema"
           KAFKA_BOOTSTRAP_SERVERS: "localhost:19092"
           SCHEMA_REGISTRY_URL: http://localhost:8081
 
@@ -124,29 +115,14 @@ jobs:
           docker compose up -d kafka-1 kafka-2 kafka-3 schema-registry kafka-init \
             clickhouse postgres minio minio-init aggregator-migrate producer aggregator
 
-      - name: Wait for producer healthy
+      - name: Wait for producer and aggregator healthy
         run: |
-          timeout 300 bash -c '
-            until curl -fsS http://localhost:8000/health >/dev/null 2>&1; do
-              echo "waiting for producer..."; sleep 10
+          timeout 360 bash -c '
+            until curl -fsS http://localhost:8000/health >/dev/null 2>&1 && \
+                  curl -fsS http://localhost:8001/health >/dev/null 2>&1; do
+              echo "waiting..."; sleep 10
             done
           '
-
-      - name: Wait for aggregator ready
-        run: |
-          timeout 300 bash -c '
-            until curl -fsS http://localhost:8001/ready >/dev/null 2>&1; do
-              echo "waiting for aggregator..."; sleep 10
-            done
-          '
-
-      - name: Show aggregator health status and logs
-        run: |
-          echo "=== aggregator /health ==="
-          curl -s http://localhost:8001/health || true
-          echo ""
-          echo "=== aggregator logs ==="
-          docker compose logs aggregator --tail 30
 
       - name: Install test dependencies
         run: |
@@ -160,7 +136,7 @@ jobs:
           AGGREGATOR_URL: http://localhost:8001
           CLICKHOUSE_HOST: localhost
           CLICKHOUSE_PORT: "8123"
-          POSTGRES_DSN: "[Secrets80]:[Secrets81]:[Secrets82]:[Secrets83]/cinema"
+          POSTGRES_DSN: "[Secrets88]:[Secrets89]:[Secrets90]:[Secrets91]/cinema"
           KAFKA_BOOTSTRAP_SERVERS: "localhost:19092"
           SCHEMA_REGISTRY_URL: http://localhost:8081
 
@@ -190,18 +166,11 @@ jobs:
       - name: Start full observability stack
         run: docker compose up -d
 
-      - name: Wait for producer healthy
+      - name: Wait for producer and aggregator healthy
         run: |
-          timeout 300 bash -c '
-            until curl -fsS http://localhost:8000/health >/dev/null 2>&1; do
-              echo "waiting for producer..."; sleep 10
-            done
-          '
-
-      - name: Wait for aggregator and prometheus ready
-        run: |
-          timeout 300 bash -c '
-            until curl -fsS http://localhost:8001/ready >/dev/null 2>&1 && \
+          timeout 360 bash -c '
+            until curl -fsS http://localhost:8000/health >/dev/null 2>&1 && \
+                  curl -fsS http://localhost:8001/health >/dev/null 2>&1 && \
                   curl -fsS http://localhost:9090/-/healthy >/dev/null 2>&1; do
               echo "waiting..."; sleep 10
             done
