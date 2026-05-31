@@ -1,0 +1,81 @@
+groups:
+  - name: services
+    interval: 30s
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[5m])) by (job)
+            /
+            sum(rate(http_requests_total[5m])) by (job)
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "High 5xx error rate on {{ $labels.job }} ({{ $value | humanizePercentage }})"
+          description: "Error rate exceeded 5% for 5 consecutive minutes. Check logs: docker compose logs {{ $labels.job }} --tail 200"
+
+      - alert: HighLatencyP95
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le, job)(rate(http_request_duration_seconds_bucket[5m]))
+          ) > 1.0
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "High p95 latency on {{ $labels.job }} ({{ $value | humanizeDuration }})"
+          description: "p95 request latency exceeded 1 second for 5 consecutive minutes."
+
+      - alert: KafkaConsumerLag
+        expr: |
+          max by (consumergroup, topic) (kafka_consumergroup_lag) > 5000
+        for: 3m
+        labels:
+          severity: warn
+        annotations:
+          summary: "Kafka consumer lag high: {{ $labels.consumergroup }}/{{ $labels.topic }} = {{ $value }}"
+          description: "Consumer group {{ $labels.consumergroup }} is lagging by {{ $value }} messages on {{ $labels.topic }}."
+
+      - alert: TargetDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: page
+        annotations:
+          summary: "Target {{ $labels.instance }} ({{ $labels.job }}) is down"
+          description: "Prometheus cannot scrape {{ $labels.instance }}. Service may be crashed."
+
+  - name: slo_burn
+    interval: 30s
+    rules:
+      - alert: SLOBurnAvailability
+        expr: sli:availability:ratio_5m < 0.95
+        for: 5m
+        labels:
+          severity: page
+          slo: availability
+        annotations:
+          summary: "SLO breach: API availability {{ $value | humanizePercentage }} < 95%"
+          description: "Availability SLO breach - failure threshold crossed. Immediate action required."
+
+      - alert: SLOBurnLatency
+        expr: sli:e2e_latency:p95_5m > 1.0
+        for: 5m
+        labels:
+          severity: page
+          slo: latency
+        annotations:
+          summary: "SLO breach: p95 latency {{ $value | humanizeDuration }} > 1s"
+          description: "Latency SLO failure threshold crossed (>1s p95). Degraded user experience."
+
+      - alert: SLOBurnProcessingDelay
+        expr: sli:processing_delay:p95_5m > 10.0
+        for: 5m
+        labels:
+          severity: page
+          slo: processing_delay
+        annotations:
+          summary: "SLO breach: event processing delay p95 {{ $value | humanizeDuration }} > 10s"
+          description: "Event processing delay failure threshold crossed. Aggregator may be stuck."

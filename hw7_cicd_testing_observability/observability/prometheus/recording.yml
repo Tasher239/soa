@@ -1,0 +1,40 @@
+groups:
+  - name: sli
+    interval: 30s
+    rules:
+      # SLI 1: API availability - ratio of 2xx responses from producer
+      - record: sli:availability:ratio_5m
+        expr: |
+          sum(rate(http_requests_total{job="producer", status=~"2.."}[5m]))
+          /
+          sum(rate(http_requests_total{job="producer"}[5m]))
+
+      # SLI 2: e2e latency p95 on producer /events endpoint
+      - record: sli:e2e_latency:p95_5m
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le)(rate(http_request_duration_seconds_bucket{job="producer", endpoint="/events"}[5m]))
+          )
+
+      # SLI 3: event processing delay p95 (kafka produce → consumer processing)
+      - record: sli:processing_delay:p95_5m
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le)(rate(event_processing_delay_seconds_bucket[5m]))
+          )
+
+  - name: http_rates
+    interval: 15s
+    rules:
+      # Pre-aggregated RPS per job - reused in Grafana to avoid redundant PromQL
+      - record: job:http_requests:rate1m
+        expr: sum by (job, endpoint)(rate(http_requests_total[1m]))
+
+      - record: job:http_errors:rate1m
+        expr: sum by (job)(rate(http_requests_total{status=~"5.."}[1m]))
+
+      - record: job:http_errors:ratio1m
+        expr: |
+          sum by (job)(rate(http_requests_total{status=~"5.."}[1m]))
+          /
+          sum by (job)(rate(http_requests_total[1m]))
