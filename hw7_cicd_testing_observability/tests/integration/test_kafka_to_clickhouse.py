@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 import httpx
 import pytest
 
-from tests.conftest import PRODUCER_URL, ch_client, unique_id, wait_for_ch_event
+from conftest import PRODUCER_URL, ch_client, unique_id, wait_for_ch_event
 
 
 @pytest.mark.asyncio

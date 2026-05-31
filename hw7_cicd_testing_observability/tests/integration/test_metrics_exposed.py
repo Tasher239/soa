@@ -4,7 +4,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from tests.conftest import AGGREGATOR_URL, PRODUCER_URL
+from conftest import AGGREGATOR_URL, PRODUCER_URL
 
 REQUIRED_METRICS = [
     "http_requests_total",

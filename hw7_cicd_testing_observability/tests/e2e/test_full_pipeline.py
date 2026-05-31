@@ -9,7 +9,7 @@ import asyncpg
 import httpx
 import pytest
 
-from tests.conftest import (
+from conftest import (
     AGGREGATOR_URL,
     POSTGRES_DSN,
     PRODUCER_URL,

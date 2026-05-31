@@ -8,7 +8,7 @@ import httpx
 import pytest
 from confluent_kafka import Consumer, KafkaException
 
-from tests.conftest import KAFKA_BOOTSTRAP_SERVERS, PRODUCER_URL, unique_id
+from conftest import KAFKA_BOOTSTRAP_SERVERS, PRODUCER_URL, unique_id
 
 
 @pytest.fixture
