@@ -193,8 +193,10 @@ jobs:
       - name: Run k6 load test
         run: |
           mkdir -p artifacts
+          chmod 777 artifacts
           docker run --rm \
             --network host \
+            --user "$(id -u):$(id -g)" \
             -e PRODUCER_URL=http://localhost:8000 \
             -v "$PWD/tests/load:/scripts" \
             -v "$PWD/artifacts:/out" \
