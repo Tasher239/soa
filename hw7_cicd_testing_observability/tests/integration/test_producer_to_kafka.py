@@ -98,7 +98,7 @@ async def test_published_event_reaches_kafka(avro_consumer):
     assert found is not None, f"Event user={user_id} not found in Kafka within 60s"
     assert found["event_type"] == "VIEW_STARTED"
     assert found["device_type"] == "MOBILE"
-    assert found["event_id"] == event_id
+    assert str(found["event_id"]) == event_id
 
 
 @pytest.mark.asyncio
