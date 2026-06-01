@@ -4,7 +4,6 @@ COMPOSE = docker compose
 PROMETHEUS_URL ?= http://localhost:9090
 PRODUCER_URL ?= http://localhost:8000
 
-# ── Stack lifecycle ───────────────────────────────────────────────────────────
 up:
 	$(COMPOSE) up -d --build
 	@echo "Waiting for services to be healthy..."
@@ -24,7 +23,6 @@ restart: down up
 build:
 	$(COMPOSE) build --parallel
 
-# ── Tests ─────────────────────────────────────────────────────────────────────
 test-unit:
 	pip install -q services/shared/ fastapi httpx pytest pytest-asyncio prometheus-client
 	pytest tests/unit -v --tb=short
@@ -55,7 +53,6 @@ test-e2e:
 
 test-all: test-unit test-int test-e2e
 
-# ── Load test ─────────────────────────────────────────────────────────────────
 load:
 	mkdir -p artifacts
 	docker run --rm \
@@ -66,12 +63,10 @@ load:
 		-w /out \
 		grafana/k6:0.55.0 run /scripts/k6_load.js
 
-# ── SLO check ─────────────────────────────────────────────────────────────────
 slo-check:
 	pip install -q httpx
 	PROMETHEUS_URL=$(PROMETHEUS_URL) python tests/load/slo_check.py
 
-# ── Alert demos ───────────────────────────────────────────────────────────────
 alert-error:
 	@echo "Generating 5xx errors for HighErrorRate alert demo..."
 	docker run --rm --network host grafana/k6:0.55.0 run - <<'EOF'
@@ -86,7 +81,6 @@ alert-down:
 	@echo "Aggregator stopped. Alertmanager should fire TargetDown within 1 minute."
 	@echo "Restore with: docker compose start aggregator"
 
-# ── Utilities ─────────────────────────────────────────────────────────────────
 logs:
 	$(COMPOSE) logs -f producer aggregator
 
