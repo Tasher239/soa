@@ -1,0 +1,163 @@
+{
+  "uid": "cinema-producer",
+  "title": "Cinema Producer Service",
+  "tags": ["cinema", "producer", "service"],
+  "refresh": "5s",
+  "time": {"from": "now-15m", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "title": "Requests per Second",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": {"mode": "palette-classic"}
+        }
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus"},
+          "expr": "sum by (endpoint)(rate(http_requests_total{job=\"producer\"}[1m]))",
+          "legendFormat": "{{endpoint}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Latency p50 / p95 / p99",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {"mode": "palette-classic"}
+        }
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus"},
+          "expr": "histogram_quantile(0.50, sum by (le)(rate(http_request_duration_seconds_bucket{job=\"producer\"}[5m])))",
+          "legendFormat": "p50"
+        },
+        {
+          "datasource": {"type": "prometheus"},
+          "expr": "histogram_quantile(0.95, sum by (le)(rate(http_request_duration_seconds_bucket{job=\"producer\"}[5m])))",
+          "legendFormat": "p95"
+        },
+        {
+          "datasource": {"type": "prometheus"},
+          "expr": "histogram_quantile(0.99, sum by (le)(rate(http_request_duration_seconds_bucket{job=\"producer\"}[5m])))",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Error Rate %",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 8},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 0.01},
+              {"color": "red", "value": 0.05}
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus"},
+          "expr": "sum(rate(http_requests_total{job=\"producer\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{job=\"producer\"}[5m]))",
+          "legendFormat": "Error Rate"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Errors by Type",
+      "type": "barchart",
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 8},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {"mode": "palette-classic"}
+        }
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus"},
+          "expr": "sum by (error_type)(rate(http_request_errors_total{job=\"producer\"}[5m]))",
+          "legendFormat": "{{error_type}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Total Requests (5m)",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 8},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "blue", "value": null}]
+          }
+        }
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus"},
+          "expr": "increase(http_requests_total{job=\"producer\"}[5m])",
+          "legendFormat": "Requests"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Kafka Messages Published",
+      "type": "timeseries",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 8},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {"mode": "palette-classic"}
+        }
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus"},
+          "expr": "rate(cinema_producer_events_total{job=\"producer\"}[1m])",
+          "legendFormat": "{{event_type}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Request Latency Heatmap",
+      "type": "heatmap",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 12},
+      "options": {
+        "calculate": false,
+        "yAxis": {"unit": "s"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus"},
+          "expr": "sum by (le)(rate(http_request_duration_seconds_bucket{job=\"producer\"}[1m]))",
+          "legendFormat": "{{le}}",
+          "format": "heatmap"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39
+}

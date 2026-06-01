@@ -1,0 +1,26 @@
+[project]
+name = "cinema-aggregator"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "cinema-shared",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "sqlalchemy>=2.0.35",
+    "asyncpg>=0.29",
+    "alembic>=1.14",
+    "clickhouse-connect>=0.8",
+    "apscheduler>=3.10",
+    "tenacity>=9.0",
+    "aioboto3>=13.2",
+    "pyarrow>=18.0",
+    "pandas>=2.2",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]

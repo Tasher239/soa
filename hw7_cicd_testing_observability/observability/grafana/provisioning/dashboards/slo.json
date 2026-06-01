@@ -1,0 +1,170 @@
+{
+  "uid": "cinema-slo",
+  "title": "Cinema SLI / SLO",
+  "description": "System-level SLIs vs SLO targets and failure thresholds",
+  "tags": ["cinema", "slo", "sli"],
+  "refresh": "10s",
+  "time": {"from": "now-1h", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "title": "API Availability (SLI 1)",
+      "description": "SLO: >99.5% | Failure threshold: <95%",
+      "type": "stat",
+      "gridPos": {"h": 6, "w": 8, "x": 0, "y": 0},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 0.95},
+              {"color": "green", "value": 0.995}
+            ]
+          },
+          "mappings": []
+        }
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus"},
+          "expr": "sli:availability:ratio_5m",
+          "legendFormat": "Availability"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "e2e Latency p95 (SLI 2)",
+      "description": "SLO: <500ms | Failure threshold: >1000ms",
+      "type": "stat",
+      "gridPos": {"h": 6, "w": 8, "x": 8, "y": 0},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 0.5},
+              {"color": "red", "value": 1.0}
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus"},
+          "expr": "sli:e2e_latency:p95_5m",
+          "legendFormat": "p95 latency"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Event Processing Delay p95 (SLI 3)",
+      "description": "SLO: <2s | Failure threshold: >10s",
+      "type": "stat",
+      "gridPos": {"h": 6, "w": 8, "x": 16, "y": 0},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 2},
+              {"color": "red", "value": 10}
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus"},
+          "expr": "sli:processing_delay:p95_5m",
+          "legendFormat": "p95 processing delay"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "API Availability over time",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 6},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0.9,
+          "max": 1,
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 0.95},
+              {"color": "green", "value": 0.995}
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus"},
+          "expr": "sli:availability:ratio_5m",
+          "legendFormat": "Availability"
+        }
+      ],
+      "options": {
+        "tooltip": {"mode": "multi"},
+        "legend": {"displayMode": "list"}
+      }
+    },
+    {
+      "id": 5,
+      "title": "Latency SLIs over time",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14},
+      "fieldConfig": {
+        "defaults": {"unit": "s", "color": {"mode": "palette-classic"}}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus"},
+          "expr": "sli:e2e_latency:p95_5m",
+          "legendFormat": "e2e p95"
+        },
+        {
+          "datasource": {"type": "prometheus"},
+          "expr": "sli:processing_delay:p95_5m",
+          "legendFormat": "processing delay p95"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Active SLO Alerts",
+      "type": "alertlist",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14},
+      "options": {
+        "alertName": "",
+        "dashboardAlerts": false,
+        "groupBy": [],
+        "groupMode": "default",
+        "maxItems": 20,
+        "sortOrder": 1,
+        "stateFilter": {
+          "error": true,
+          "firing": true,
+          "noData": false,
+          "normal": false,
+          "pending": true
+        }
+      }
+    }
+  ],
+  "schemaVersion": 39
+}

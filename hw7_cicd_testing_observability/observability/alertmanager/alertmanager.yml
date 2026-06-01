@@ -1,0 +1,25 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: webhook
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 1h
+  group_by: ['alertname', 'job', 'severity']
+
+receivers:
+  - name: webhook
+    webhook_configs:
+      - url: 'http://host.docker.internal:5001/'
+        send_resolved: true
+        http_config:
+          follow_redirects: true
+        max_alerts: 0
+
+inhibit_rules:
+  - source_matchers:
+      - severity="page"
+    target_matchers:
+      - severity="warn"
+    equal: ['job']
